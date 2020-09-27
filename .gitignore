@@ -1,2 +1,7 @@
 .idea
 cmake-*/
+
+# Visual Studio
+.vs
+out/
+*.exe

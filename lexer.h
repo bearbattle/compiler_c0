@@ -66,7 +66,7 @@ private:
 	string str;
 	TokenType type;
 public:
-	friend ostream& operator<<(ostream& out, Token&& A);
+	friend ostream& operator<<(ostream& out, Token& A);
 	Token();
 	Token(string str, TokenType type);
 	Token(char ch_i, TokenType type);
@@ -77,5 +77,5 @@ extern ifstream inputFile;
 extern ofstream outputFile;
 
 void getChar();
-Token getToken();
+Token* getToken();
 #endif // !_COMPILER_C0_LEXER

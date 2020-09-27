@@ -11,7 +11,6 @@ static char store_ch;
 static TokenType symbol;
 
 // Some of the procedure and functions
-static void getChar();
 static void clearToken();
 static bool isSpace();
 static bool isNewline();
@@ -66,10 +65,12 @@ static bool isQuota();
 static bool isStringChar();
 static bool isExclam();
 
+static bool isEnd();
+
 // Token construct
 static void catToken();
 static void retract();
-static TokenType reserver();
+static TokenType reserved();
 static int transNum();
 static void error();
 
@@ -80,50 +81,51 @@ Token::Token()
 = default;
 
 Token::Token(string str, TokenType type) {
-	this->str = std::move(str);
-	this->type = type;
+    this->str = std::move(str);
+    this->type = type;
 }
 
 Token::Token(char ch_i, TokenType type) {
-	this->str = ch_i;
-	this->type = type;
+    this->str = ch_i;
+    this->type = type;
 }
 
 // Token Class Output
-ostream& operator<<(ostream& out, Token&& A) {
-	out << tokenStringMap[A.type] << ' ' << A.str;
-	return out;
+ostream& operator<<(ostream & out, Token & A) {
+    out << tokenStringMap[A.type] << ' ' << A.str;
+    return out;
 }
 
 // Some of the global variants
 void getChar() {
-	inputFile >> ch;
+    ch = inputFile.get();
 }
 
 static void clearToken() {
-	token = string("");
+    token = string("");
 }
 
 static bool isSpace() {
-	return ch == ' ';
+    return ch == ' ';
 }
 
 static bool isNewline() {
-	return ch == '\n';
+    return ch == '\n' ||
+        ch == '\r';
 }
 
 static bool isTab() {
-	return ch == '\t';
+    return ch == '\t';
 }
 
 static bool isLetter() {
-	return (ch >= 'A' && ch <= 'Z') || // Uppercase
-		(ch >= 'a' && ch <= 'z') || // Lowercase
-		(ch == '_');
+    return (ch >= 'A' && ch <= 'Z') || // Uppercase
+        (ch >= 'a' && ch <= 'z') || // Lowercase
+        (ch == '_');
 }
 
 static bool isDigit() {
-	return ch >= '0' && ch <= '9';
+    return ch >= '0' && ch <= '9';
 }
 
 //static bool isIdenfr();
@@ -147,29 +149,29 @@ static bool isDigit() {
 //static bool isReturntk();
 
 static bool isPlus() {
-	return ch == '+';
+    return ch == '+';
 }
 
 static bool isMinu() {
-	return ch == '-';
+    return ch == '-';
 }
 
 static bool isMult() {
-	return ch == '*';
+    return ch == '*';
 }
 
 static bool isDiv() {
-	return ch == '/';
+    return ch == '/';
 }
 
 static bool isLss() {
-	return ch == '<';
+    return ch == '<';
 }
 
 //static bool isLeq();
 
 static bool isGre() {
-	return ch == '>';
+    return ch == '>';
 }
 
 //static bool isGeq();
@@ -177,244 +179,253 @@ static bool isGre() {
 //static bool isNeq();
 
 static bool isColon() {
-	return ch == ':';
+    return ch == ':';
 }
 
 static bool isAssign() {
-	return ch == '=';
+    return ch == '=';
 }
 
 static bool isSemicn() {
-	return ch == ';';
+    return ch == ';';
 }
 
 static bool isComma() {
-	return ch == ',';
+    return ch == ',';
 }
 
 static bool isLparent() {
-	return ch == '(';
+    return ch == '(';
 }
 
 static bool isRparent() {
-	return ch == ')';
+    return ch == ')';
 }
 
 static bool isLbrack() {
-	return ch == '[';
+    return ch == '[';
 }
 
 static bool isRbrack() {
-	return ch == ']';
+    return ch == ']';
 }
 
 static bool isLbrace() {
-	return ch == '{';
+    return ch == '{';
 }
 
 static bool isRbrace() {
-	return ch == '}';
+    return ch == '}';
 }
 
 static bool isApost() {
-	return ch == '\'';
+    return ch == '\'';
 }
 
 static bool isChar() {
-	return ch == '+' ||
-		ch == '-' ||
-		ch == '*' ||
-		ch == '/' ||
-		isDigit() ||
-		isLetter();
+    return ch == '+' ||
+        ch == '-' ||
+        ch == '*' ||
+        ch == '/' ||
+        isDigit() ||
+        isLetter();
 }
 
 static bool isQuota() {
-	return ch == '"';
+    return ch == '"';
 }
 
 static bool isStringChar() {
-	return !isQuota() && (ch >= 32 && ch <= 126);
+    return !isQuota() && (ch >= 32 && ch <= 126);
 }
 
 static bool isExclam() {
-	return ch == '!';
+    return ch == '!';
+}
+
+static bool isEnd() {
+    return ch == EOF;
 }
 
 // Token Constructor
 static void catToken() {
-	token += ch;
+    token += ch;
 }
 
 static void retract() {
-	inputFile.unget();
+    inputFile.unget();
 }
 
-static TokenType reserver() {
-	try
-	{
-		string lowercase("");
-		transform(token.begin(), token.end(), lowercase.begin(),
-			[](unsigned char c) { return tolower(c); });
-		return reserveWords.at(lowercase);
-	}
-	catch (const out_of_range& e)
-	{
-		return IDENFR;
-	}
+static TokenType reserved() {
+    try
+    {
+        string lowercase;
+        for (char c : token)
+        {
+            lowercase += tolower(c);
+        }
+        return reserveWords.at(lowercase);
+    }
+    catch (const out_of_range& e)
+    {
+        return IDENFR;
+    }
 }
 
 static int transNum() {
-	return stoi(token);
+    return stoi(token);
 }
 
 static void error() {
-	cout << "error!" << endl;
+    cout << "error!" << endl;
 }
 
-Token getToken() {
-	clearToken();
-	while (isSpace() || isNewline() || isTab()) {
-		getChar();
-	}
-	if (isLetter()) {
-		while (isLetter() || isDigit())
-		{
-			catToken();
-			getChar();
-		}
-		retract();
-		return Token(token, reserver());
-	}
-	else if (isDigit()) {
-		while (isDigit()) {
-			catToken();
-			getChar();
-		}
-		retract();
-		num = transNum();
-		return Token(token, INTCON);
-	}
-	else if (isApost()) {
-		getChar();
-		clearToken();
-		if (isChar()) {
-			catToken();
-			getChar();
-			if (isApost()) {
-				return Token(token, CHARCON);
-			}
-		}
-	}
-	else if (isQuota()) {
-		getChar();
-		clearToken();
-		while (isStringChar()) {
-			catToken();
-			getChar();
-		}
-		if (isQuota()) {
-			return Token(token, STRCON);
-		}
-	}
-	else if (isLss()) {
-		getchar();
-		catToken();
-		if (isAssign()) {
-			catToken();
-			return Token(token, LEQ);
-		}
-		else {
-			retract();
-			return Token(token, LSS);
-		}
-	}
-	else if (isGre()) {
-		getchar();
-		catToken();
-		if (isAssign()) {
-			catToken();
-			return Token(token, GEQ);
-		}
-		else {
-			retract();
-			return Token(token, GRE);
-		}
-	}
-	else if (isAssign()) {
-		getchar();
-		catToken();
-		if (isAssign()) {
-			catToken();
-			return Token(token, EQL);
-		}
-		else {
-			retract();
-			return Token(token, ASSIGN);
-		}
-	}
-	else if (isExclam()) {
-		getchar();
-		catToken();
-		if (isAssign()) {
-			catToken();
-			return Token(token, NEQ);
-		}
-	}
-	else if (isPlus()) {
-		catToken();
-		return Token(token, PLUS);
-	}
-	else if (isMinu()) {
-		catToken();
-		return Token(token, MINU);
-	}
-	else if (isMult()) {
-		catToken();
-		return Token(token, MULT);
-	}
-	else if (isDiv()) {
-		catToken();
-		return Token(token, DIV);
-	}
-	else if (isColon()) {
-		catToken();
-		return Token(token, COLON);
-	}
-	else if (isSemicn()) {
-		catToken();
-		return Token(token, SEMICN);
-	}
-	else if (isComma()) {
-		catToken();
-		return Token(token, COMMA);
-	}
-	else if (isLparent()) {
-		catToken();
-		return Token(token, LPARENT);
-	}
-	else if (isRparent()) {
-		catToken();
-		return Token(token, RPARENT);
-	}
-	else if (isLbrack()) {
-		catToken();
-		return Token(token, LBRACK);
-	}
-	else if (isRbrack()) {
-		catToken();
-		return Token(token, RBRACK);
-	}
-	else if (isLbrace()) {
-		catToken();
-		return Token(token, LBRACE);
-	}
-	else if (isRbrace()) {
-		catToken();
-		return Token(token, RBRACE);
-	}
-	else {
-		error();
-	}
-	return Token();
+Token* getToken() {
+    clearToken();
+    while (isSpace() || isNewline() || isTab()) {
+        getChar();
+    }
+    if (isEnd()) {
+        return NULL;
+    }
+    if (isLetter()) {
+        while (isLetter() || isDigit())
+        {
+            catToken();
+            getChar();
+        }
+        retract();
+        return new Token(token, reserved());
+    }
+    else if (isDigit()) {
+        while (isDigit()) {
+            catToken();
+            getChar();
+        }
+        retract();
+        num = transNum();
+        return new Token(token, INTCON);
+    }
+    else if (isApost()) {
+        getChar();
+        clearToken();
+        if (isChar()) {
+            catToken();
+            getChar();
+            if (isApost()) {
+                return new Token(token, CHARCON);
+            }
+        }
+    }
+    else if (isQuota()) {
+        getChar();
+        clearToken();
+        while (isStringChar()) {
+            catToken();
+            getChar();
+        }
+        if (isQuota()) {
+            return new Token(token, STRCON);
+        }
+    }
+    else if (isLss()) {
+        catToken();
+        getChar();
+        if (isAssign()) {
+            catToken();
+            return new Token(token, LEQ);
+        }
+        else {
+            retract();
+            return new Token(token, LSS);
+        }
+    }
+    else if (isGre()) {
+        catToken();
+        getChar();
+        if (isAssign()) {
+            catToken();
+            return new Token(token, GEQ);
+        }
+        else {
+            retract();
+            return new Token(token, GRE);
+        }
+    }
+    else if (isAssign()) {
+        catToken();
+        getChar();
+        if (isAssign()) {
+            catToken();
+            return new Token(token, EQL);
+        }
+        else {
+            retract();
+            return new Token(token, ASSIGN);
+        }
+    }
+    else if (isExclam()) {
+        catToken();
+        getChar();
+        if (isAssign()) {
+            catToken();
+            return new Token(token, NEQ);
+        }
+    }
+    else if (isPlus()) {
+        catToken();
+        return new Token(token, PLUS);
+    }
+    else if (isMinu()) {
+        catToken();
+        return new Token(token, MINU);
+    }
+    else if (isMult()) {
+        catToken();
+        return new Token(token, MULT);
+    }
+    else if (isDiv()) {
+        catToken();
+        return new Token(token, DIV);
+    }
+    else if (isColon()) {
+        catToken();
+        return new Token(token, COLON);
+    }
+    else if (isSemicn()) {
+        catToken();
+        return new Token(token, SEMICN);
+    }
+    else if (isComma()) {
+        catToken();
+        return new Token(token, COMMA);
+    }
+    else if (isLparent()) {
+        catToken();
+        return new Token(token, LPARENT);
+    }
+    else if (isRparent()) {
+        catToken();
+        return new Token(token, RPARENT);
+    }
+    else if (isLbrack()) {
+        catToken();
+        return new Token(token, LBRACK);
+    }
+    else if (isRbrack()) {
+        catToken();
+        return new Token(token, RBRACK);
+    }
+    else if (isLbrace()) {
+        catToken();
+        return new Token(token, LBRACE);
+    }
+    else if (isRbrace()) {
+        catToken();
+        return new Token(token, RBRACE);
+    }
+    else {
+        error();
+    }
+    return new Token();
 }

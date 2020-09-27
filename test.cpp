@@ -1,4 +1,7 @@
-#include "lexer.h"
+#include <iostream>
+#include <fstream>
+
+using namespace std;
 
 ifstream inputFile;
 ofstream outputFile;
@@ -7,12 +10,7 @@ int main() {
     inputFile.open("testfile.txt");
     outputFile.open("output.txt");
     while (!inputFile.eof()) {
-        getChar();
-        Token* ptk = getToken();
-        if (ptk != NULL) {
-            Token tk = *ptk;
-            outputFile << tk << endl;
-        }
+        outputFile << ((int)(inputFile.get())) << endl;
     }
     inputFile.close();
     outputFile.close();
