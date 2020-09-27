@@ -1,4 +1,4 @@
-#include "myio.h"
+
 
 void main() {
     const int a = +10;
