@@ -9,9 +9,8 @@ int main() {
     while (!inputFile.eof()) {
         getChar();
         Token* ptk = getToken();
-        if (ptk != NULL) {
-            Token tk = *ptk;
-            outputFile << tk << endl;
+        if (ptk != nullptr) {
+            outputFile << *ptk << endl;
         }
     }
     inputFile.close();

@@ -5,3 +5,8 @@ cmake-*/
 .vs
 out/
 *.exe
+
+# Submit
+*.zip
+*.pdf
+*.md

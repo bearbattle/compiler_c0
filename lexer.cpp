@@ -91,7 +91,7 @@ Token::Token(char ch_i, TokenType type) {
 }
 
 // Token Class Output
-ostream& operator<<(ostream & out, Token & A) {
+ostream& operator<<(ostream & out, const Token & A) {
     out << tokenStringMap[A.type] << ' ' << A.str;
     return out;
 }
@@ -257,19 +257,21 @@ static void retract() {
 }
 
 static TokenType reserved() {
-    try
+
+    string lowercase;
+    for (char c : token)
     {
-        string lowercase;
-        for (char c : token)
-        {
-            lowercase += tolower(c);
-        }
-        return reserveWords.at(lowercase);
+        lowercase += tolower(c);
     }
-    catch (const out_of_range& e)
-    {
+    auto item = reserveWords.find(lowercase);
+
+    if (item != reserveWords.end()) {
+        return item->second;
+    }
+    else {
         return IDENFR;
     }
+
 }
 
 static int transNum() {
