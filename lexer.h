@@ -6,6 +6,7 @@
 #include <map>
 #include <fstream>
 #include <algorithm>
+#include <deque>
 
 using namespace std;
 
@@ -70,12 +71,23 @@ public:
     Token();
     Token(string str, TokenType type);
     Token(char ch_i, TokenType type);
+    TokenType getType();
+
+    const string &getStr() const;
 };
 
 // IO File Streams
 extern ifstream inputFile;
 extern ofstream outputFile;
 
+namespace lexer {
+    extern Token* curToken;
+    extern deque<Token*> afterWards;
+    Token* preFetch(int amount);
+    Token* _getToken();
+    void getToken();
+    TokenType getTokenType();
+}
+
 void getChar();
-Token* getToken();
 #endif // !_COMPILER_C0_LEXER

@@ -1,6 +1,7 @@
 #include "lexer.h"
 
 #include <utility>
+#include <deque>
 
 // Some of the global variants
 // See *Wolf Book* P71
@@ -12,10 +13,15 @@ static TokenType symbol;
 
 // Some of the procedure and functions
 static void clearToken();
+
 static bool isSpace();
+
 static bool isNewline();
+
 static bool isTab();
+
 static bool isLetter();
+
 static bool isDigit();
 
 //static bool isIdenfr();
@@ -40,40 +46,63 @@ static bool isDigit();
 
 // Character check
 static bool isPlus();
+
 static bool isMinu();
+
 static bool isMult();
+
 static bool isDiv();
+
 static bool isLss();
+
 //static bool isLeq();
 static bool isGre();
+
 //static bool isGeq();
 //static bool isEql();
 //static bool isNeq();
 static bool isColon();
+
 static bool isAssign();
+
 static bool isSemicn();
+
 static bool isComma();
+
 static bool isLparent();
+
 static bool isRparent();
+
 static bool isLbrack();
+
 static bool isRbrack();
+
 static bool isLbrace();
+
 static bool isRbrace();
+
 static bool isApost();
+
 static bool isChar();
+
 static bool isQuota();
+
 static bool isStringChar();
+
 static bool isExclam();
 
 static bool isEnd();
 
 // Token construct
 static void catToken();
-static void retract();
-static TokenType reserved();
-static int transNum();
-static void error();
 
+static void retract();
+
+static TokenType reserved();
+
+static int transNum();
+
+static void error();
 
 
 // Token Class Constructor
@@ -94,6 +123,14 @@ Token::Token(char ch_i, TokenType type) {
 ostream& operator<<(ostream & out, const Token & A) {
     out << tokenStringMap[A.type] << ' ' << A.str;
     return out;
+}
+
+TokenType Token::getType() {
+    return this->type;
+}
+
+const string& Token::getStr() const {
+    return str;
 }
 
 // Some of the global variants
@@ -259,8 +296,7 @@ static void retract() {
 static TokenType reserved() {
 
     string lowercase;
-    for (char c : token)
-    {
+    for (char c : token) {
         lowercase += tolower(c);
     }
     auto item = reserveWords.find(lowercase);
@@ -278,21 +314,20 @@ static int transNum() {
     return stoi(token);
 }
 
-static void error() {
-    cout << "error!" << endl;
+static inline void error() {
+    cout << "Lexer Error!" << endl;
 }
 
-Token* getToken() {
+Token* lexer::_getToken() {
     clearToken();
     while (isSpace() || isNewline() || isTab()) {
         getChar();
     }
     if (isEnd()) {
-        return NULL;
+        return nullptr;
     }
     if (isLetter()) {
-        while (isLetter() || isDigit())
-        {
+        while (isLetter() || isDigit()) {
             catToken();
             getChar();
         }
@@ -430,4 +465,41 @@ Token* getToken() {
         error();
     }
     return new Token();
+}
+
+Token* lexer::curToken;
+
+deque<Token*> lexer::afterWards;
+
+TokenType lexer::getTokenType() {
+    return lexer::curToken->getType();
+}
+
+void lexer::getToken() {
+    if (!afterWards.empty()) {
+        curToken = afterWards.front();
+        afterWards.pop_front();
+    }
+    else {
+        curToken = _getToken();
+    }
+    if (curToken != nullptr) {
+        outputFile << *curToken << endl;
+    }
+}
+
+Token* lexer::preFetch(int amount) {
+    if (afterWards.size() >= amount) {
+        return afterWards[amount - 1];
+    }
+    for (int i = afterWards.size(); i < amount && !isEnd(); ++i) {
+        Token* ptk = _getToken();
+        if (ptk != nullptr) {
+            afterWards.push_back(_getToken());
+        }
+        else {
+            break;
+        }
+    }
+    return afterWards[amount - 1];
 }

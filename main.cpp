@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include "parser.h"
 
 ifstream inputFile;
 ofstream outputFile;
@@ -6,13 +7,8 @@ ofstream outputFile;
 int main() {
     inputFile.open("testfile.txt");
     outputFile.open("output.txt");
-    while (!inputFile.eof()) {
-        getChar();
-        Token* ptk = getToken();
-        if (ptk != nullptr) {
-            outputFile << *ptk << endl;
-        }
-    }
+    lexer::getToken();
+    program();
     inputFile.close();
     outputFile.close();
     return 0;
