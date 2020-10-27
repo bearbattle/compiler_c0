@@ -319,6 +319,7 @@ static inline void error() {
 }
 
 Token* lexer::_getToken() {
+    getChar();
     clearToken();
     while (isSpace() || isNewline() || isTab()) {
         getChar();
@@ -467,7 +468,7 @@ Token* lexer::_getToken() {
     return new Token();
 }
 
-Token* lexer::curToken;
+Token* lexer::curToken = nullptr;
 
 deque<Token*> lexer::afterWards;
 
@@ -476,15 +477,15 @@ TokenType lexer::getTokenType() {
 }
 
 void lexer::getToken() {
+    if (curToken != nullptr) {
+        outputFile << *curToken << endl;
+    }
     if (!afterWards.empty()) {
         curToken = afterWards.front();
         afterWards.pop_front();
     }
     else {
         curToken = _getToken();
-    }
-    if (curToken != nullptr) {
-        outputFile << *curToken << endl;
     }
 }
 
@@ -495,7 +496,7 @@ Token* lexer::preFetch(int amount) {
     for (int i = afterWards.size(); i < amount && !isEnd(); ++i) {
         Token* ptk = _getToken();
         if (ptk != nullptr) {
-            afterWards.push_back(_getToken());
+            afterWards.push_back(ptk);
         }
         else {
             break;

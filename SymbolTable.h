@@ -25,9 +25,9 @@ private:
 public:
     SymbolTableEntry(string name, BaseType baseType);
 
-    const string &getName() const;
+    const string& getName() const;
 
-    void setName(const string &name);
+    void setName(const string& name);
 
     BaseType getBaseType() const;
 
@@ -46,9 +46,9 @@ public:
     void setDimension(int dimension);
 };
 
-extern deque<map<string, SymbolTableEntry *>> SymTabs;
+extern deque<map<string, SymbolTableEntry*>> SymTabs;
 
 void initSymTabs();
-map<string, SymbolTableEntry *> getGSymTab();
+map<string, SymbolTableEntry*>& getGSymTab();
 
 #endif //COMPILER_0_SYMBOLTABLE_H

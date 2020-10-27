@@ -9,11 +9,11 @@ SymbolTableEntry::SymbolTableEntry(string name, BaseType baseType) {
     this->_baseType = baseType;
 }
 
-const string &SymbolTableEntry::getName() const {
+const string& SymbolTableEntry::getName() const {
     return _name;
 }
 
-void SymbolTableEntry::setName(const string &name) {
+void SymbolTableEntry::setName(const string& name) {
     _name = name;
 }
 
@@ -53,8 +53,8 @@ void initSymTabs() {
     SymTabs.emplace_back();
 }
 
-map<string, SymbolTableEntry *> getGSymTab() {
+map<string, SymbolTableEntry*>& getGSymTab() {
     return SymTabs.back();
 }
 
-deque<map<string, SymbolTableEntry *>> SymTabs;
+deque<map<string, SymbolTableEntry*>> SymTabs;

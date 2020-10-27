@@ -23,7 +23,7 @@ static void varDefNoInit(); // Native: typeSpec(), <IDENFR>, [], unsignedInteger
 static void varDefWithInit(); // Native: typeSpec(), <IDENFR>, [], unsignedInteger(), constExpr()
 
 // returnFuncDef:
-static SymbolTableEntry *defHead(); // Native: int|char <IDENFR>
+static SymbolTableEntry* defHead(); // Native: int|char <IDENFR>
 static void paramTable(); // 39
 static void compoundStat(); // 41
 
@@ -73,6 +73,7 @@ static void defaultStat(); // Native: stat()
 static void integer();// Native: +|- unsignedInteger()
 static void unsignedInteger();// Native: <INTCON>
 static void character(); // Native: <CHARCON>
+static void stringCon();
 static void expr(); // Native: +|-, term()
 static void term(); // Native: factor(), * /
 static void factor(); // Native: <IDENFR>, [], integer(), character(), returnCallStat()
@@ -80,9 +81,9 @@ static void relationOp(); // Native: < | <= | > | >= | != | ==
 static void constExpr();
 
 // error
-static inline void error() {
-    cout << "error!" << __FUNCTION__ << __LINE__ << endl;
-}
+#define error() do { \
+    cout << "Parser Error! At " << __FUNCTION__ << ":" << __LINE__ << endl; \
+} while (false)
 
 // judge
 static bool isVarDec();
@@ -119,57 +120,61 @@ void program() {
     if (lexer::curToken == nullptr) {
         error();
     }
-    TokenType curType = lexer::getTokenType();
-    if (curType == CONSTTK) {
+    if (lexer::getTokenType() == CONSTTK) {
         constDec();
     }
     if (isVarDec()) {
         varDec();
     }
-    while (curType == INTTK || curType == CHARTK || curType == VOIDTK) {
-        if (curType == VOIDTK) {
-            Token *next = lexer::preFetch(1);
+    while (lexer::getTokenType() == INTTK ||
+        lexer::getTokenType() == CHARTK ||
+        lexer::getTokenType() == VOIDTK) {
+        if (lexer::getTokenType() == VOIDTK) {
+            Token* next = lexer::preFetch(1);
             TokenType nextType = next->getType();
-            if (nextType != MAINTK)
+            if (nextType != MAINTK) {
                 nonReturnFuncDef();
-        } else {
+            }
+            else {
+                break;
+            }
+        }
+        else {
             returnFuncDef();
         }
-        curType = lexer::getTokenType();
     }
     mainFunc();
     outputFile << "<程序>" << endl;
 }
 
 static void constDec() {
-    assert (lexer::getTokenType() == CONSTTK);
+    assert(lexer::getTokenType() == CONSTTK);
     do {
         lexer::getToken();
         constDef();
-        if (lexer::getTokenType() != SEMICN)
+        if (lexer::getTokenType() == SEMICN) {
+            lexer::getToken();
+        }
+        else {
             error();
-        lexer::getToken();
+        }
     } while (lexer::getTokenType() == CONSTTK);
-    if (lexer::getTokenType() != SEMICN) {
-        error();
-    } else {
-        outputFile << "<常量说明>" << endl;
-    }
+    outputFile << "<常量说明>" << endl;
 }
 
 static bool isVarDec() {
     TokenType curType = lexer::getTokenType();
     if (curType == INTTK || curType == CHARTK) {
-        Token *next = lexer::preFetch(2);
+        Token* next = lexer::preFetch(2);
         TokenType nextType = next->getType();
         switch (nextType) {
-            case SEMICN:
-            case COMMA:
-            case LBRACK:
-            case ASSIGN:
-                return true;
-            default:
-                break;
+        case SEMICN:
+        case COMMA:
+        case LBRACK:
+        case ASSIGN:
+            return true;
+        default:
+            break;
         }
     }
     return false;
@@ -178,28 +183,33 @@ static bool isVarDec() {
 static void varDec() {
     do {
         varDef();
-        if (lexer::getTokenType() != SEMICN)
+        if (lexer::getTokenType() == SEMICN) {
+            lexer::getToken();
+        }
+        else {
             error();
-        lexer::getToken();
+        }
     } while (isVarDec());
-    outputFile << "<常量说明>" << endl;
+    outputFile << "<变量说明>" << endl;
 }
 
 
 static void returnFuncDef() {
-    auto *newEntry = defHead();
+    auto* newEntry = defHead();
     if (lexer::getTokenType() == LPARENT) {
         lexer::getToken();
         paramTable();
         if (lexer::getTokenType() == RPARENT) {
             lexer::getToken();
+            newEntry->setFunc(true);
+            getGSymTab()[newEntry->getName()] = newEntry;
             if (lexer::getTokenType() == LBRACE) {
                 lexer::getToken();
                 compoundStat();
                 if (lexer::getTokenType() == RBRACE) {
+                    /*newEntry->setFunc(true);
+                    getGSymTab()[newEntry->getName()] = newEntry;*/
                     lexer::getToken();
-                    newEntry->setFunc(true);
-                    getGSymTab().insert(make_pair(newEntry->getName(), newEntry));
                     outputFile << "<有返回值函数定义>" << endl;
                     return;
                 }
@@ -213,22 +223,25 @@ static void nonReturnFuncDef() {
     assert(lexer::getTokenType() == VOIDTK);
     lexer::getToken();
     if (lexer::getTokenType() == IDENFR) {
-        const string &funcName = lexer::curToken->getStr();
+        string funcName = lexer::curToken->getStr();
         lexer::getToken();
         if (lexer::getTokenType() == LPARENT) {
             lexer::getToken();
             paramTable();
             if (lexer::getTokenType() == RPARENT) {
+                auto* newEntry = new SymbolTableEntry(funcName, VOID);
+                newEntry->setFunc(true);
+                getGSymTab()[funcName] = newEntry;
                 lexer::getToken();
                 if (lexer::getTokenType() == LBRACE) {
                     lexer::getToken();
                     compoundStat();
                     if (lexer::getTokenType() == RBRACE) {
+                        /*auto* newEntry = new SymbolTableEntry(funcName, VOID);
+                        newEntry->setFunc(true);
+                        getGSymTab()[funcName] = newEntry;*/
                         lexer::getToken();
                         outputFile << "<无返回值函数定义>" << endl;
-                        auto *newEntry = new SymbolTableEntry(funcName, VOID);
-                        newEntry->setFunc(true);
-                        getGSymTab().insert(make_pair(funcName, newEntry));
                         return;
                     }
                 }
@@ -241,7 +254,7 @@ static void nonReturnFuncDef() {
 static void mainFunc() {
     if (lexer::getTokenType() == VOIDTK) {
         lexer::getToken();
-        if (lexer::getTokenType() == IDENFR) {
+        if (lexer::getTokenType() == MAINTK) {
             lexer::getToken();
             if (lexer::getTokenType() == LPARENT) {
                 lexer::getToken();
@@ -284,7 +297,8 @@ static void constDef() {
                 return;
             }
         }
-    } else if (lexer::getTokenType() == CHARTK) {
+    }
+    else if (lexer::getTokenType() == CHARTK) {
         lexer::getToken();
         if (lexer::getTokenType() == IDENFR) {
             lexer::getToken();
@@ -297,7 +311,7 @@ static void constDef() {
                         lexer::getToken();
                         if (lexer::getTokenType() == ASSIGN) {
                             lexer::getToken();
-                            integer();
+                            character();
                         }
                     }
                 }
@@ -311,42 +325,42 @@ static void constDef() {
 
 static VarDefType isVarDef() {
     if (lexer::getTokenType() == INTTK || lexer::getTokenType() == CHARTK) {
-        Token *next2 = lexer::preFetch(2), *next5, *next8;
+        Token* next2 = lexer::preFetch(2), * next5, * next8;
         TokenType nextType2 = next2->getType(), nextType5, nextType8;
         switch (nextType2) {
+        case SEMICN:
+        case COMMA:
+            return VARDEFNOINIT;
+        case ASSIGN:
+            return VARDEFWITHINIT;
+        case LBRACK:
+            next5 = lexer::preFetch(5);
+            nextType5 = next5->getType();
+            switch (nextType5) {
             case SEMICN:
             case COMMA:
                 return VARDEFNOINIT;
             case ASSIGN:
                 return VARDEFWITHINIT;
             case LBRACK:
-                next5 = lexer::preFetch(5);
-                nextType5 = next5->getType();
-                switch (nextType5) {
-                    case SEMICN:
-                    case COMMA:
-                        return VARDEFNOINIT;
-                    case ASSIGN:
-                        return VARDEFWITHINIT;
-                    case LBRACK:
-                        next8 = lexer::preFetch(8);
-                        nextType8 = next8->getType();
-                        switch (nextType8) {
-                            case SEMICN:
-                            case COMMA:
-                                return VARDEFNOINIT;
-                            case ASSIGN:
-                                return VARDEFWITHINIT;
-                            default:
-                                break;
-                        }
-                        break;
-                    default:
-                        break;
+                next8 = lexer::preFetch(8);
+                nextType8 = next8->getType();
+                switch (nextType8) {
+                case SEMICN:
+                case COMMA:
+                    return VARDEFNOINIT;
+                case ASSIGN:
+                    return VARDEFWITHINIT;
+                default:
+                    break;
                 }
                 break;
             default:
                 break;
+            }
+            break;
+        default:
+            break;
         }
     }
     return NONVARDEF;
@@ -354,17 +368,17 @@ static VarDefType isVarDef() {
 
 static void varDef() {
     switch (isVarDef()) {
-        case VARDEFNOINIT:
-            varDefNoInit();
-            break;
-        case VARDEFWITHINIT:
-            varDefWithInit();
-            break;
-        case NONVARDEF:
-            error();
-            break;
+    case VARDEFNOINIT:
+        varDefNoInit();
+        break;
+    case VARDEFWITHINIT:
+        varDefWithInit();
+        break;
+    case NONVARDEF:
+        error();
+        break;
     }
-    outputFile << "<变量说明>" << endl;
+    outputFile << "<变量定义>" << endl;
 }
 
 static void varDefNoInit() {
@@ -382,15 +396,18 @@ static void varDefNoInit() {
                     unsignedInteger();
                     if (lexer::getTokenType() == RBRACK) {
                         lexer::getToken();
-                    } else {
+                    }
+                    else {
                         error();
                     }
                 }
-            } else {
+            }
+            else {
                 error();
             }
         }
         while (lexer::getTokenType() == COMMA) {
+            lexer::getToken();
             if (lexer::getTokenType() == IDENFR) {
                 lexer::getToken();
                 if (lexer::getTokenType() == LBRACK) {
@@ -403,11 +420,13 @@ static void varDefNoInit() {
                             unsignedInteger();
                             if (lexer::getTokenType() == RBRACK) {
                                 lexer::getToken();
-                            } else {
+                            }
+                            else {
                                 error();
                             }
                         }
-                    } else {
+                    }
+                    else {
                         error();
                     }
                 }
@@ -445,41 +464,72 @@ static void varDefWithInit() {
                                     }
                                     if (lexer::getTokenType() == RBRACE) {
                                         lexer::getToken();
-                                    } else {
-                                        error();
-                                    }
-                                } else {
-                                    error();
-                                }
-                                while (lexer::getTokenType() == COMMA) {
-                                    lexer::getToken();
-                                    if (lexer::getTokenType() == LBRACE) { // Inner Brace
-                                        lexer::getToken();
-                                        constExpr();
                                         while (lexer::getTokenType() == COMMA) {
                                             lexer::getToken();
-                                            constExpr();
+                                            if (lexer::getTokenType() == LBRACE) { // Inner Brace
+                                                lexer::getToken();
+                                                constExpr();
+                                                while (lexer::getTokenType() == COMMA) {
+                                                    lexer::getToken();
+                                                    constExpr();
+                                                }
+                                                if (lexer::getTokenType() == RBRACE) {
+                                                    lexer::getToken();
+                                                }
+                                                else {
+                                                    error();
+                                                }
+                                            }
                                         }
                                         if (lexer::getTokenType() == RBRACE) {
                                             lexer::getToken();
-                                        } else {
+                                        }
+                                        else {
                                             error();
                                         }
-                                    } else {
+                                    }
+                                    else {
                                         error();
                                     }
                                 }
-                            } else {
+                                else {
+                                    error();
+                                }
+                                //while (lexer::getTokenType() == COMMA) {
+                                //    lexer::getToken();
+                                //    if (lexer::getTokenType() == LBRACE) { // Inner Brace
+                                //        lexer::getToken();
+                                //        constExpr();
+                                //        while (lexer::getTokenType() == COMMA) {
+                                //            lexer::getToken();
+                                //            constExpr();
+                                //        }
+                                //        if (lexer::getTokenType() == RBRACE) {
+                                //            lexer::getToken();
+                                //        }
+                                //        else {
+                                //            error();
+                                //        }
+                                //    }
+                                //    else {
+                                //        error();
+                                //    }
+                                //}
+                            }
+                            else {
                                 error();
                             }
                             // Dimension 2 Right End
                         }
-                    } else {
+                    }
+                    else {
                         error();
                     }
-                } else if (lexer::getTokenType() == ASSIGN) { // Dimension 1 Right
+                }
+                else if (lexer::getTokenType() == ASSIGN) { // Dimension 1 Right
                     lexer::getToken();
                     if (lexer::getTokenType() == LBRACE) {
+                        lexer::getToken();
                         constExpr();
                         while (lexer::getTokenType() == COMMA) {
                             lexer::getToken();
@@ -492,31 +542,35 @@ static void varDefWithInit() {
                     }
 
                 }
-            } else {
+            }
+            else {
                 error();
             }
-        } else if (lexer::getTokenType() == ASSIGN) { // Dimension 0 Right
+        }
+        else if (lexer::getTokenType() == ASSIGN) { // Dimension 0 Right
             lexer::getToken();
             constExpr();
-        } else {
+        }
+        else {
             error();
         }
     }
     outputFile << "<变量定义及初始化>" << endl;
 }
 
-static SymbolTableEntry *defHead() {
+static SymbolTableEntry* defHead() {
     TokenType retType = lexer::getTokenType();
     if (retType == INTTK || retType == CHARTK) {
         lexer::getToken();
         if (lexer::getTokenType() == IDENFR) {
-            const string &funcName = lexer::curToken->getStr();
+            const string& funcName = lexer::curToken->getStr();
             const BaseType baseType = retType == INTTK ? INT : CHAR;
             lexer::getToken();
             outputFile << "<声明头部>" << endl;
             return new SymbolTableEntry(funcName, baseType);
         }
-    } else {
+    }
+    else {
         error();
     }
     return nullptr;
@@ -526,7 +580,8 @@ static void paramTable() {
     if (lexer::getTokenType() == RPARENT) {
         outputFile << "<参数表>" << endl;
         return;
-    } else if (lexer::getTokenType() == INTTK || lexer::getTokenType() == CHARTK) {
+    }
+    else if (lexer::getTokenType() == INTTK || lexer::getTokenType() == CHARTK) {
         typeSpec();
         if (lexer::getTokenType() == IDENFR) {
             lexer::getToken();
@@ -535,16 +590,19 @@ static void paramTable() {
                 typeSpec();
                 if (lexer::getTokenType() == IDENFR) {
                     lexer::getToken();
-                } else {
+                }
+                else {
                     error();
                 }
             }
             outputFile << "<参数表>" << endl;
             return;
-        } else {
+        }
+        else {
             error();
         }
-    } else {
+    }
+    else {
         error();
     }
 }
@@ -562,8 +620,10 @@ static void compoundStat() {
 
 static void typeSpec() {
     if (lexer::getTokenType() == INTTK || lexer::getTokenType() == CHARTK) {
+        lexer::getToken();
         return;
-    } else {
+    }
+    else {
         error();
     }
 }
@@ -576,102 +636,137 @@ static void stats() {
 }
 
 static StatType isStat() {
-    Token *next;
+    Token* next;
     TokenType nextType;
     BaseType retType;
     string id;
-    SymbolTableEntry *ptr;
+    SymbolTableEntry* ptr;
     switch (lexer::getTokenType()) {
-        case WHILETK:
-        case FORTK:
-            return LOOPSTAT;
-        case IFTK:
-            return IFSTAT;
-        case SCANFTK:
-            return READSTAT;
-        case PRINTFTK:
-            return WRITESTAT;
-        case SWITCHTK:
-            return CASESTAT;
-        case SEMICN:
-            return VOIDSTAT;
-        case RETURNTK:
-            return RETURNSTAT;
-        case LBRACE:
-            return STATS;
-        case IDENFR:
-            id = lexer::curToken->getStr();
-            next = lexer::preFetch(1);
-            nextType = next->getType();
-            if (nextType == ASSIGN) {
-                return ASSIGNSTAT;
-            } else if (nextType == LPARENT) {
-                ptr = getGSymTab().at(id);
-                if (ptr->isFunc()) {
-                    retType = ptr->getBaseType();
-                    if (retType == VOID) {
-                        return NONRETURNCALLSTAT;
-                    } else if (retType == INT || retType == CHAR) {
-                        return RETURNCALLSTAT;
-                    }
-                } else {
-                    error();
+    case WHILETK:
+    case FORTK:
+        return LOOPSTAT;
+    case IFTK:
+        return IFSTAT;
+    case SCANFTK:
+        return READSTAT;
+    case PRINTFTK:
+        return WRITESTAT;
+    case SWITCHTK:
+        return CASESTAT;
+    case SEMICN:
+        return VOIDSTAT;
+    case RETURNTK:
+        return RETURNSTAT;
+    case LBRACE:
+        return STATS;
+    case IDENFR:
+        id = lexer::curToken->getStr();
+        next = lexer::preFetch(1);
+        nextType = next->getType();
+        if (nextType == ASSIGN
+            || nextType == LBRACK) {
+            return ASSIGNSTAT;
+        }
+        else if (nextType == LPARENT) {
+            ptr = getGSymTab().at(id);
+            if (ptr->isFunc()) {
+                retType = ptr->getBaseType();
+                if (retType == VOID) {
+                    return NONRETURNCALLSTAT;
                 }
-            } else {
+                else if (retType == INT || retType == CHAR) {
+                    return RETURNCALLSTAT;
+                }
+            }
+            else {
                 error();
             }
-        default:
-            return NONSTAT;
+        }
+        else {
+            error();
+        }
+    default:
+        return NONSTAT;
     }
 }
 
 static void stat() {
     switch (isStat()) {
-        case LOOPSTAT:
-            loopStat();
-            break;
-        case IFSTAT:
-            ifStat();
-            break;
-        case RETURNCALLSTAT:
-            returnCallStat();
-            break;
-        case NONRETURNCALLSTAT:
-            nonReturnCallStat();
-            break;
-        case ASSIGNSTAT:
-            assignStat();
-            break;
-        case READSTAT:
-            readStat();
-            break;
-        case WRITESTAT:
-            writeStat();
-            break;
-        case CASESTAT:
-            caseStat();
-            break;
-        case RETURNSTAT:
-            returnStat();
-            break;
-        case VOIDSTAT:
-            break;
-        case STATS:
-            if (lexer::getTokenType() == LBRACE) {
+    case LOOPSTAT:
+        loopStat();
+        break;
+    case IFSTAT:
+        ifStat();
+        break;
+    case RETURNCALLSTAT:
+        returnCallStat();
+        if (lexer::getTokenType() == SEMICN)
+        {
+            lexer::getToken();
+        }
+        break;
+    case NONRETURNCALLSTAT:
+        nonReturnCallStat();
+        if (lexer::getTokenType() == SEMICN)
+        {
+            lexer::getToken();
+        }
+        break;
+    case ASSIGNSTAT:
+        assignStat();
+        if (lexer::getTokenType() == SEMICN)
+        {
+            lexer::getToken();
+        }
+        break;
+    case READSTAT:
+        readStat();
+        if (lexer::getTokenType() == SEMICN)
+        {
+            lexer::getToken();
+        }
+        break;
+    case WRITESTAT:
+        writeStat();
+        if (lexer::getTokenType() == SEMICN)
+        {
+            lexer::getToken();
+        }
+        break;
+    case CASESTAT:
+        caseStat();
+        break;
+    case RETURNSTAT:
+        returnStat();
+        if (lexer::getTokenType() == SEMICN)
+        {
+            lexer::getToken();
+        }
+        break;
+    case VOIDSTAT:
+        if (lexer::getTokenType() == SEMICN)
+        {
+            lexer::getToken();
+        }
+        break;
+    case STATS:
+        if (lexer::getTokenType() == LBRACE) {
+            lexer::getToken();
+            stats();
+            if (lexer::getTokenType() == RBRACE) {
                 lexer::getToken();
-                stats();
-                if (lexer::getTokenType() == RBRACE) {
-                    lexer::getToken();
-                } else {
-                    error();
-                }
-            } else {
+            }
+            else {
                 error();
             }
-            break;
-        default:
+        }
+        else {
             error();
-            break;
+        }
+        break;
+    default:
+        error();
+        break;
     }
     outputFile << "<语句>" << endl;
 }
@@ -680,14 +775,17 @@ static void loopStat() {
     if (lexer::getTokenType() == WHILETK) {
         lexer::getToken();
         if (lexer::getTokenType() == LPARENT) {
+            lexer::getToken();
             condition();
             if (lexer::getTokenType() == RPARENT) {
+                lexer::getToken();
                 stat();
                 outputFile << "<循环语句>" << endl;
                 return;
             }
         }
-    } else if (lexer::getTokenType() == FORTK) {
+    }
+    else if (lexer::getTokenType() == FORTK) {
         lexer::getToken();
         if (lexer::getTokenType() == LPARENT) {
             lexer::getToken();
@@ -803,14 +901,16 @@ static void assignStat() {
                             return;
                         }
                     }
-                } else if (lexer::getTokenType() == ASSIGN) { // Dimension 1 Right
+                }
+                else if (lexer::getTokenType() == ASSIGN) { // Dimension 1 Right
                     lexer::getToken();
                     expr();
                     outputFile << "<赋值语句>" << endl;
                     return;
                 }
             }
-        } else if (lexer::getTokenType() == ASSIGN) { // Dimension 0 Right
+        }
+        else if (lexer::getTokenType() == ASSIGN) { // Dimension 0 Right
             lexer::getToken();
             expr();
             outputFile << "<赋值语句>" << endl;
@@ -844,10 +944,11 @@ static void writeStat() {
         if (lexer::getTokenType() == LPARENT) {
             lexer::getToken();
             if (lexer::getTokenType() == STRCON) {
-                lexer::getToken();
+                stringCon();
                 if (lexer::getTokenType() == COMMA) {
                     lexer::getToken();
-                } else if (lexer::getTokenType() == RPARENT) {
+                }
+                else if (lexer::getTokenType() == RPARENT) {
                     lexer::getToken();
                     outputFile << "<写语句>" << endl;
                     return;
@@ -898,7 +999,8 @@ static void returnStat() {
                 lexer::getToken();
                 outputFile << "<返回语句>" << endl;
                 return;
-            } else {
+            }
+            else {
                 error();
             }
         }
@@ -971,10 +1073,10 @@ static void integer() {
     if (lexer::getTokenType() == PLUS ||
         lexer::getTokenType() == MINU) {
         lexer::getToken();
-        unsignedInteger();
-        outputFile << "<整数>" << endl;
-        return;
     }
+    unsignedInteger();
+    outputFile << "<整数>" << endl;
+    return;
     error();
 }
 
@@ -982,7 +1084,8 @@ static void unsignedInteger() {
     if (lexer::getTokenType() == INTCON) {
         lexer::getToken();
         outputFile << "<无符号整数>" << endl;
-    } else {
+    }
+    else {
         error();
     }
 }
@@ -990,7 +1093,18 @@ static void unsignedInteger() {
 static void character() {
     if (lexer::getTokenType() == CHARCON) {
         lexer::getToken();
-    } else {
+    }
+    else {
+        error();
+    }
+}
+
+static void stringCon() {
+    if (lexer::getTokenType() == STRCON) {
+        lexer::getToken();
+        outputFile << "<字符串>" << endl;
+    }
+    else {
         error();
     }
 }
@@ -1002,7 +1116,7 @@ static void expr() {
     }
     term();
     while (lexer::getTokenType() == PLUS ||
-           lexer::getTokenType() == MINU) {
+        lexer::getTokenType() == MINU) {
         lexer::getToken();
         term();
     }
@@ -1012,9 +1126,9 @@ static void expr() {
 static void term() {
     factor();
     while (lexer::getTokenType() == MULT ||
-           lexer::getTokenType() == DIV) {
+        lexer::getTokenType() == DIV) {
         lexer::getToken();
-        term();
+        factor();
     }
     outputFile << "<项>" << endl;
 }
@@ -1039,29 +1153,34 @@ static void factor() {
                         lexer::getToken();
                         outputFile << "<因子>" << endl;
                         return;
-                    } else {
+                    }
+                    else {
                         error();
                     }
                 }
                 outputFile << "<因子>" << endl;
                 return;
-            } else {
+            }
+            else {
                 error();
             }
         }
         outputFile << "<因子>" << endl;
         return;
-    } else if (lexer::getTokenType() == PLUS ||
-               lexer::getTokenType() == MINU ||
-               lexer::getTokenType() == INTCON) {
+    }
+    else if (lexer::getTokenType() == PLUS ||
+        lexer::getTokenType() == MINU ||
+        lexer::getTokenType() == INTCON) {
         integer();
         outputFile << "<因子>" << endl;
         return;
-    } else if (lexer::getTokenType() == CHARCON) {
+    }
+    else if (lexer::getTokenType() == CHARCON) {
         character();
         outputFile << "<因子>" << endl;
         return;
-    } else if (lexer::getTokenType() == LPARENT) {
+    }
+    else if (lexer::getTokenType() == LPARENT) {
         lexer::getToken();
         expr();
         if (lexer::getTokenType() == RPARENT) {
@@ -1074,24 +1193,33 @@ static void factor() {
 
 static void relationOp() {
     switch (lexer::getTokenType()) {
-        case LSS:
-        case LEQ:
-        case GRE:
-        case GEQ:
-        case EQL:
-        case NEQ:
-            lexer::getToken();
-            return;
-        default:
-            error();
+    case LSS:
+    case LEQ:
+    case GRE:
+    case GEQ:
+    case EQL:
+    case NEQ:
+        lexer::getToken();
+        return;
+    default:
+        error();
     }
 }
 
 static void constExpr() {
-    if (lexer::getTokenType() == INTCON ||
-        lexer::getTokenType() == CHARCON) {
+    switch (lexer::getTokenType()) {
+    case INTCON:
+    case PLUS:
+    case MINU:
         integer();
         outputFile << "<常量>" << endl;
         return;
+    case CHARCON:
+        character();
+        outputFile << "<常量>" << endl;
+        return;
+    default:
+        break;
     }
+    error();
 }
