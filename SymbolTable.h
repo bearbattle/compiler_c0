@@ -1,54 +1,117 @@
-//
-// Created by chao4 on 2020/10/18 0018.
-//
-
 #ifndef COMPILER_0_SYMBOLTABLE_H
 #define COMPILER_0_SYMBOLTABLE_H
 
 #include <string>
 #include <map>
+#include <vector>
 #include <deque>
 
 using namespace std;
 
-enum BaseType {
-    INT, CHAR, VOID
+enum BaseType
+{
+	UNDEF, INT, CHAR, VOID
 };
 
-class SymbolTableEntry {
+class SymTabEntry;
+
+class SymTab;
+
+class Param;
+
+class ParamTab;
+
+class SymTabEntry
+{
 private:
-    string _name;
-    BaseType _baseType;
-    bool _isFunc;
-    bool _isConst;
-    int _dimension;
+	string _name;
+	BaseType _baseType;
+	bool _isFunc;
+	bool _isConst;
+	int _dimension;
+	int _line;
+	int _initVal;
+	SymTab* _symTab;
+	ParamTab* _paramTab;
+	int _length[2];
 public:
-    SymbolTableEntry(string name, BaseType baseType);
+	SymTabEntry(const string& name, BaseType baseType, int line);
 
-    const string& getName() const;
+	const string& getName() const;
 
-    void setName(const string& name);
+	BaseType getBaseType() const;
 
-    BaseType getBaseType() const;
+	int getLine() const;
 
-    void setBaseType(BaseType baseType);
+	bool isFunc() const;
 
-    bool isFunc() const;
+	void setFunc(bool isFunc);
 
-    void setFunc(bool isFunc);
+	bool isConst() const;
 
-    bool isConst() const;
+	void setConst(bool isConst);
 
-    void setConst(bool isConst);
+	int getDimension() const;
 
-    int getDimension() const;
+	void setDimension(int dimension);
 
-    void setDimension(int dimension);
+	SymTab* getSymTab() const;
+
+	void setSymTab(SymTab* symTab);
+
+	ParamTab* getParamTab() const;
+
+	void setParamTab(ParamTab* paramTab);
+
+	int getInitVal() const;
+
+	void setInitVal(int initVal);
+
+	int getLength(int dimension) const;
+
+	void setLength(int dimension, int length);
 };
 
-extern deque<map<string, SymbolTableEntry*>> SymTabs;
+class SymTab
+{
+private:
+	map<string, SymTabEntry*> _symTab;
+	int layer;
+public:
+	SymTab();
+
+	SymTabEntry* find(const string& str);
+
+	bool exist(const string& str, bool curLayer = false);
+
+	void addEntry(const string& name, SymTabEntry* entry, bool override = false);
+};
+
+class Param
+{
+private:
+	BaseType type;
+	string name;
+public:
+	Param(BaseType type, const string& name);
+
+	BaseType getType() const;
+};
+
+class ParamTab
+{
+private:
+	vector <Param> params;
+public:
+	void addParam(BaseType type, const string& name);
+
+	bool fitParam(int order, BaseType type);
+};
+
+extern deque<SymTab*> SymTabs;
 
 void initSymTabs();
-map<string, SymbolTableEntry*>& getGSymTab();
+
+SymTab*& getGSymTab();
 
 #endif //COMPILER_0_SYMBOLTABLE_H

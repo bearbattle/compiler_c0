@@ -1,6 +1,6 @@
 #include "lexer.h"
-
-#include <utility>
+#include "Error.h"
+#include "Utility.h"
 #include <deque>
 
 // Some of the global variants
@@ -10,6 +10,7 @@ static string token;
 static int num;
 static char store_ch;
 static TokenType symbol;
+static int curLine = 1;
 
 // Some of the procedure and functions
 static void clearToken();
@@ -106,21 +107,26 @@ static void error();
 
 
 // Token Class Constructor
-Token::Token()
-= default;
+Token::Token() {
+    this->str = string("");
+    this->type = INVALID;
+    this->line = curLine;
+};
 
 Token::Token(string str, TokenType type) {
     this->str = std::move(str);
     this->type = type;
+    this->line = curLine;
 }
 
 Token::Token(char ch_i, TokenType type) {
     this->str = ch_i;
     this->type = type;
+    this->line = curLine;
 }
 
 // Token Class Output
-ostream& operator<<(ostream & out, const Token & A) {
+ostream &operator<<(ostream &out, const Token &A) {
     out << tokenStringMap[A.type] << ' ' << A.str;
     return out;
 }
@@ -129,11 +135,21 @@ TokenType Token::getType() {
     return this->type;
 }
 
-const string& Token::getStr() const {
+const string &Token::getStr() const {
     return str;
 }
 
-// Some of the global variants
+int Token::getLine() const {
+    return line;
+}
+
+static bool isASCII() {
+    return ch >= 20 &&
+           ch <= 126 &&
+           !isApost() &&
+           !isQuota();
+}
+
 void getChar() {
     ch = inputFile.get();
 }
@@ -147,8 +163,11 @@ static bool isSpace() {
 }
 
 static bool isNewline() {
+    if (ch == '\n') {
+        curLine++;
+    }
     return ch == '\n' ||
-        ch == '\r';
+           ch == '\r';
 }
 
 static bool isTab() {
@@ -157,8 +176,8 @@ static bool isTab() {
 
 static bool isLetter() {
     return (ch >= 'A' && ch <= 'Z') || // Uppercase
-        (ch >= 'a' && ch <= 'z') || // Lowercase
-        (ch == '_');
+           (ch >= 'a' && ch <= 'z') || // Lowercase
+           (ch == '_');
 }
 
 static bool isDigit() {
@@ -260,12 +279,18 @@ static bool isApost() {
 }
 
 static bool isChar() {
-    return ch == '+' ||
+    if (ch == '+' ||
         ch == '-' ||
         ch == '*' ||
         ch == '/' ||
         isDigit() ||
-        isLetter();
+        isLetter()) {
+        return true;
+    } else if (isASCII()) {
+        errList.emplace_back(a, curLine);
+        return true;
+    }
+    return false;
 }
 
 static bool isQuota() {
@@ -273,7 +298,13 @@ static bool isQuota() {
 }
 
 static bool isStringChar() {
-    return !isQuota() && (ch >= 32 && ch <= 126);
+    if (!isQuota() && (ch >= 32 && ch <= 126)) {
+        return true;
+    } else if (isASCII()) {
+        errList.emplace_back(a, curLine);
+        return true;
+    }
+    return false;
 }
 
 static bool isExclam() {
@@ -294,20 +325,12 @@ static void retract() {
 }
 
 static TokenType reserved() {
-
-    string lowercase;
-    for (char c : token) {
-        lowercase += tolower(c);
-    }
-    auto item = reserveWords.find(lowercase);
-
+    auto item = reserveWords.find(tolower(token));
     if (item != reserveWords.end()) {
         return item->second;
-    }
-    else {
+    } else {
         return IDENFR;
     }
-
 }
 
 static int transNum() {
@@ -318,7 +341,7 @@ static inline void error() {
     cout << "Lexer Error!" << endl;
 }
 
-Token* lexer::_getToken() {
+Token *lexer::_getToken() {
     getChar();
     clearToken();
     while (isSpace() || isNewline() || isTab()) {
@@ -334,8 +357,7 @@ Token* lexer::_getToken() {
         }
         retract();
         return new Token(token, reserved());
-    }
-    else if (isDigit()) {
+    } else if (isDigit()) {
         while (isDigit()) {
             catToken();
             getChar();
@@ -343,19 +365,20 @@ Token* lexer::_getToken() {
         retract();
         num = transNum();
         return new Token(token, INTCON);
-    }
-    else if (isApost()) {
+    } else if (isApost()) {
         getChar();
         clearToken();
-        if (isChar()) {
+        while (isChar()) {
             catToken();
             getChar();
-            if (isApost()) {
-                return new Token(token, CHARCON);
-            }
         }
-    }
-    else if (isQuota()) {
+        if (isApost()) {
+            if (token.length() == 0) {
+                errList.emplace_back(a, curLine);
+            }
+            return new Token(token, CHARCON);
+        }
+    } else if (isQuota()) {
         getChar();
         clearToken();
         while (isStringChar()) {
@@ -363,114 +386,98 @@ Token* lexer::_getToken() {
             getChar();
         }
         if (isQuota()) {
+            if (token.length() == 0) {
+                errList.emplace_back(a, curLine);
+            }
             return new Token(token, STRCON);
         }
-    }
-    else if (isLss()) {
+    } else if (isLss()) {
         catToken();
         getChar();
         if (isAssign()) {
             catToken();
             return new Token(token, LEQ);
-        }
-        else {
+        } else {
             retract();
             return new Token(token, LSS);
         }
-    }
-    else if (isGre()) {
+    } else if (isGre()) {
         catToken();
         getChar();
         if (isAssign()) {
             catToken();
             return new Token(token, GEQ);
-        }
-        else {
+        } else {
             retract();
             return new Token(token, GRE);
         }
-    }
-    else if (isAssign()) {
+    } else if (isAssign()) {
         catToken();
         getChar();
         if (isAssign()) {
             catToken();
             return new Token(token, EQL);
-        }
-        else {
+        } else {
             retract();
             return new Token(token, ASSIGN);
         }
-    }
-    else if (isExclam()) {
+    } else if (isExclam()) {
         catToken();
         getChar();
         if (isAssign()) {
             catToken();
             return new Token(token, NEQ);
         }
-    }
-    else if (isPlus()) {
+    } else if (isPlus()) {
         catToken();
         return new Token(token, PLUS);
-    }
-    else if (isMinu()) {
+    } else if (isMinu()) {
         catToken();
         return new Token(token, MINU);
-    }
-    else if (isMult()) {
+    } else if (isMult()) {
         catToken();
         return new Token(token, MULT);
-    }
-    else if (isDiv()) {
+    } else if (isDiv()) {
         catToken();
         return new Token(token, DIV);
-    }
-    else if (isColon()) {
+    } else if (isColon()) {
         catToken();
         return new Token(token, COLON);
-    }
-    else if (isSemicn()) {
+    } else if (isSemicn()) {
         catToken();
         return new Token(token, SEMICN);
-    }
-    else if (isComma()) {
+    } else if (isComma()) {
         catToken();
         return new Token(token, COMMA);
-    }
-    else if (isLparent()) {
+    } else if (isLparent()) {
         catToken();
         return new Token(token, LPARENT);
-    }
-    else if (isRparent()) {
+    } else if (isRparent()) {
         catToken();
         return new Token(token, RPARENT);
-    }
-    else if (isLbrack()) {
+    } else if (isLbrack()) {
         catToken();
         return new Token(token, LBRACK);
-    }
-    else if (isRbrack()) {
+    } else if (isRbrack()) {
         catToken();
         return new Token(token, RBRACK);
-    }
-    else if (isLbrace()) {
+    } else if (isLbrace()) {
         catToken();
         return new Token(token, LBRACE);
-    }
-    else if (isRbrace()) {
+    } else if (isRbrace()) {
         catToken();
         return new Token(token, RBRACE);
-    }
-    else {
+    } else {
         error();
     }
     return new Token();
 }
 
-Token* lexer::curToken = nullptr;
+Token *lexer::prevToken = nullptr;
 
-deque<Token*> lexer::afterWards;
+Token *lexer::curToken = nullptr;
+
+deque<Token *> lexer::afterWards;
 
 TokenType lexer::getTokenType() {
     return lexer::curToken->getType();
@@ -479,26 +486,25 @@ TokenType lexer::getTokenType() {
 void lexer::getToken() {
     if (curToken != nullptr) {
         outputFile << *curToken << endl;
+        prevToken = curToken;
     }
     if (!afterWards.empty()) {
         curToken = afterWards.front();
         afterWards.pop_front();
-    }
-    else {
+    } else {
         curToken = _getToken();
     }
 }
 
-Token* lexer::preFetch(int amount) {
+Token *lexer::preFetch(int amount) {
     if (afterWards.size() >= amount) {
         return afterWards[amount - 1];
     }
     for (int i = afterWards.size(); i < amount && !isEnd(); ++i) {
-        Token* ptk = _getToken();
+        Token *ptk = _getToken();
         if (ptk != nullptr) {
             afterWards.push_back(ptk);
-        }
-        else {
+        } else {
             break;
         }
     }
