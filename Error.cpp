@@ -28,7 +28,7 @@ static map<ErrorType, char> ErrorMap = {
 
 ostream& operator<<(ostream& err, const Error& e)
 {
-	err << ErrorMap[e.type] << ' ' << e.line << endl;
+	err << e.line << ' ' << ErrorMap[e.type] << endl;
 	return err;
 }
 
@@ -39,4 +39,4 @@ Error::Error(ErrorType type, int line)
 	this->line = line;
 }
 
-vector <Error> errList;
+vector<Error> errList;

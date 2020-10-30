@@ -107,26 +107,27 @@ int SymTabEntry::getLine() const
 
 void initSymTabs()
 {
-    SymTabs.push_back(new SymTab());
+    SymTabs.push_back(new SymTab(0));
 }
 
 SymTab*& getGSymTab()
 {
-    return SymTabs.back();
+    return SymTabs.front();
 }
 
+// Front is the bottom
 deque<SymTab*> SymTabs;
 
 SymTabEntry* SymTab::find(const string& str)
 {
     string lowercase = tolower(str);
-    int i = this->layer;
+    int i = this->_layer;
     while (i >= 0)
     {
-        auto item = _symTab.find(lowercase);
-        if (item != _symTab.end())
+        auto item = SymTabs[i]->_symTab.find(lowercase);
+        if (item != SymTabs[i]->_symTab.end())
         {
-            return _symTab[lowercase];
+            return SymTabs[i]->_symTab[lowercase];
         }
         i--;
     }
@@ -153,11 +154,10 @@ bool SymTab::exist(const string& str, bool curLayer)
     }
 }
 
-SymTab::SymTab()
+SymTab::SymTab(int layer)
 {
     _symTab = map<string, SymTabEntry*>();
-    layer = SymTabs.size();
-    SymTabs.push_back(this);
+    _layer = layer;
 }
 
 void SymTab::addEntry(const string& name, SymTabEntry* entry, bool override)
@@ -165,7 +165,7 @@ void SymTab::addEntry(const string& name, SymTabEntry* entry, bool override)
     bool duplicate = exist(name, true);
     if (override || !duplicate)
     {
-        _symTab[name] = entry;
+        _symTab[tolower(name)] = entry;
     }
     if (!override && duplicate)
     {
@@ -179,11 +179,24 @@ void ParamTab::addParam(BaseType type, const string& name)
     params.emplace_back(type, name);
 }
 
-bool ParamTab::fitParam(int order, BaseType type)
+void ParamTab::checkParams(const vector<BaseType>& valTable, int line)
 {
-    return order < params.size() &&
-        params[order].getType() == type;
+    int size = params.size();
+    if (valTable.size() != size)
+    {
+        errList.emplace_back(d, line);
+        return;
+    }
+    for (int i = 0; i < size; ++i)
+    {
+        if (params[i].getType() != valTable[i])
+        {
+            errList.emplace_back(e, line);
+            return;
+        }
+    }
 }
+
 
 Param::Param(BaseType type, const string& name) : type(type), name(name)
 {
