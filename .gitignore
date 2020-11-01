@@ -5,8 +5,8 @@ cmake-*/
 .vs
 out/
 *.exe
+*.pdb
 
 # Submit
 *.zip
 *.pdf
-*.md
