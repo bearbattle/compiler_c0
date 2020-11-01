@@ -64,11 +64,11 @@ static void condition(); // Native: expr(), relationOp()
 static void step(); // Native: unsignedInteger()
 
 // returnCallState, nonReturnCallState:
-static void valueTable(); // Native: expr()
+static void valueTable(ParamTab* ptr_paramTab); // Native: expr()
 
 // caseStat: expr()
-static void caseTable(); // Native: caseSubStat()
-static void caseSubStat(); // Native: constExpr(), stat()
+static void caseTable(BaseType caseType); // Native: caseSubStat()
+static void caseSubStat(BaseType caseType); // Native: constExpr(), stat()
 static void defaultStat(); // Native: stat()
 
 // Common Usage
@@ -139,8 +139,8 @@ void program()
         varDec();
     }
     while (lexer::getTokenType() == INTTK ||
-        lexer::getTokenType() == CHARTK ||
-        lexer::getTokenType() == VOIDTK)
+           lexer::getTokenType() == CHARTK ||
+           lexer::getTokenType() == VOIDTK)
     {
         if (lexer::getTokenType() == VOIDTK)
         {
@@ -276,7 +276,8 @@ static void returnFuncDef()
                 outputFile << "<有返回值函数定义>" << endl;
                 newEntry->setSymTab(SymTabs[curLayer--]);
                 SymTabs.pop_back();
-                if (returnCount == 0) {
+                if (returnCount == 0)
+                {
                     errList.emplace_back(h, lexer::prevToken);
                 }
                 isReturnFunc = false;
@@ -349,7 +350,7 @@ static void mainFunc()
         {
             // Add SymTab of void main()
             mainEntry = new
-                SymTabEntry("main", VOID,
+                    SymTabEntry("main", VOID,
                     lexer::curToken->getLine());
             getGSymTab()->addEntry("main", mainEntry);
             SymTabs.push_back(new SymTab(++curLayer));
@@ -465,8 +466,10 @@ static VarDefType isVarDef()
     {
         int i = 2;
         TokenType nextType = lexer::preFetch(i)->getType();
-        while (true) {
-            switch (nextType) {
+        while (true)
+        {
+            switch (nextType)
+            {
             case ASSIGN:
                 return VARDEFWITHINIT;
             case LBRACK:
@@ -599,7 +602,6 @@ if (constType != varType){  \
 }                            \
 } while (false)
 
-// TODO: Initialization of var(s)
 static void varDefWithInit()
 {
     assert(isVarDef() == VARDEFWITHINIT);
@@ -831,8 +833,8 @@ static void paramTable()
             paramName = lexer::curToken->getStr();
             curParamTab->addParam(paramType, paramName);
             SymTabs[curLayer]->addEntry(paramName,
-                new SymTabEntry(paramName, paramType,
-                    lexer::curToken->getLine()));
+                    new SymTabEntry(paramName, paramType,
+                            lexer::curToken->getLine()));
             lexer::getToken();
             while (lexer::getTokenType() == COMMA)
             {
@@ -843,8 +845,8 @@ static void paramTable()
                     paramName = lexer::curToken->getStr();
                     curParamTab->addParam(paramType, paramName);
                     SymTabs[curLayer]->addEntry(paramName,
-                        new SymTabEntry(paramName, paramType,
-                            lexer::curToken->getLine()));
+                            new SymTabEntry(paramName, paramType,
+                                    lexer::curToken->getLine()));
                     lexer::getToken();
                 }
                 else
@@ -1154,7 +1156,6 @@ static void loopStat()
         //									if (lexer::getTokenType() == IDENFR)
         //									{
         //										CheckUndefinedIdentifier;
-        //										// TODO
         //										lexer::getToken();
         //										if (lexer::getTokenType() == PLUS ||
         //											lexer::getTokenType() == MINU)
@@ -1233,7 +1234,6 @@ static void loopStat()
             return;
         }
         CheckUndefinedIdentifier;
-        // TODO
         lexer::getToken();
         if (lexer::getTokenType() == PLUS ||
             lexer::getTokenType() == MINU)
@@ -1285,7 +1285,6 @@ static void ifStat()
     parseError();
 }
 
-static ParamTab* curFuncParamTab;
 
 #define GetCurFuncParamTab do { \
 curFuncParamTab = SymTabs[curLayer]->find(lexer::curToken->getStr())->getParamTab(); \
@@ -1297,6 +1296,7 @@ baseType = SymTabs[curLayer]->find(lexer::curToken->getStr())->getBaseType(); \
 
 static BaseType returnCallStat()
 {
+    ParamTab* curFuncParamTab;
     if (lexer::getTokenType() == IDENFR)
     {
         GetCurFuncParamTab;
@@ -1306,7 +1306,7 @@ static BaseType returnCallStat()
         if (lexer::getTokenType() == LPARENT)
         {
             lexer::getToken();
-            valueTable();
+            valueTable(curFuncParamTab);
             if (lexer::getTokenType() != RPARENT)
             {
                 RparentExpected;
@@ -1324,6 +1324,7 @@ static BaseType returnCallStat()
 
 static void nonReturnCallStat()
 {
+    ParamTab* curFuncParamTab;
     if (lexer::getTokenType() == IDENFR)
     {
         GetCurFuncParamTab;
@@ -1331,7 +1332,7 @@ static void nonReturnCallStat()
         if (lexer::getTokenType() == LPARENT)
         {
             lexer::getToken();
-            valueTable();
+            valueTable(curFuncParamTab);
             if (lexer::getTokenType() != RPARENT)
             {
                 RparentExpected;
@@ -1382,7 +1383,7 @@ static void assignStat()
                     {
                         errList.emplace_back(i, lexer::curToken);
                     }
-                    if (!(lexer::getTokenType() == RBRACK))
+                    if (lexer::getTokenType() != RBRACK)
                     {
                         RbrackExpected;
                         goto Rbrack2;
@@ -1500,12 +1501,9 @@ if (constType != caseType){  \
 }                            \
 } while (false)
 
-static BaseType caseType;
-
-static bool isCaseStat = false;
-
 static void caseStat()
 {
+    BaseType caseType;
     if (lexer::getTokenType() == SWITCHTK)
     {
         lexer::getToken();
@@ -1522,9 +1520,8 @@ static void caseStat()
         Rparent:
             if (lexer::getTokenType() == LBRACE)
             {
-                isCaseStat = true;
                 lexer::getToken();
-                caseTable();
+                caseTable(caseType);
                 if (lexer::getTokenType() == DEFAULTTK)
                 {
                     defaultStat();
@@ -1535,7 +1532,6 @@ static void caseStat()
                 }
                 if (lexer::getTokenType() == RBRACE)
                 {
-                    isCaseStat = false;
                     lexer::getToken();
                     outputFile << "<情况语句>" << endl;
                     return;
@@ -1621,15 +1617,14 @@ static void step()
     outputFile << "<步长>" << endl;
 }
 
-static void valueTable()
+static void valueTable(ParamTab* paramTab)
 {
     vector<BaseType> valueTable;
-    ParamTab* curParamTab = curFuncParamTab;
     if (lexer::getTokenType() == RPARENT ||
         lexer::getTokenType() == SEMICN)
     {
         outputFile << "<值参数表>" << endl;
-        curParamTab->checkParams(valueTable, lexer::curToken->getLine());
+        paramTab->checkParams(valueTable, lexer::curToken->getLine());
         return;
     }
     valueTable.push_back(expr());
@@ -1639,14 +1634,14 @@ static void valueTable()
         valueTable.push_back(expr());
     }
     outputFile << "<值参数表>" << endl;
-    curParamTab->checkParams(valueTable, lexer::curToken->getLine());
+    paramTab->checkParams(valueTable, lexer::curToken->getLine());
 }
 
-static void caseTable()
+static void caseTable(BaseType caseType)
 {
     do
     {
-        caseSubStat();
+        caseSubStat(caseType);
     } while (isCaseSubStat());
     outputFile << "<情况表>" << endl;
 }
@@ -1656,7 +1651,7 @@ static bool isCaseSubStat()
     return lexer::getTokenType() == CASETK;
 }
 
-static void caseSubStat()
+static void caseSubStat(BaseType caseType)
 {
     BaseType constType;
     if (isCaseSubStat())
@@ -1764,7 +1759,7 @@ static BaseType expr()
         ret = termType;
     }
     while (lexer::getTokenType() == PLUS ||
-        lexer::getTokenType() == MINU)
+           lexer::getTokenType() == MINU)
     {
         ret = INT;
         lexer::getToken();
@@ -1778,7 +1773,7 @@ static BaseType term()
 {
     BaseType ret = factor();
     while (lexer::getTokenType() == MULT ||
-        lexer::getTokenType() == DIV)
+           lexer::getTokenType() == DIV)
     {
         ret = INT;
         lexer::getToken();
@@ -1791,7 +1786,7 @@ static BaseType term()
 static BaseType factor()
 {
     BaseType ret = INT;
-    BaseType sub = UNDEF;
+    BaseType sub;
     if (isStat() == RETURNCALLSTAT)
     {
         ret = returnCallStat();
@@ -1851,8 +1846,8 @@ static BaseType factor()
         return ret;
     }
     else if (lexer::getTokenType() == PLUS ||
-        lexer::getTokenType() == MINU ||
-        lexer::getTokenType() == INTCON)
+             lexer::getTokenType() == MINU ||
+             lexer::getTokenType() == INTCON)
     {
         integer();
         outputFile << "<因子>" << endl;

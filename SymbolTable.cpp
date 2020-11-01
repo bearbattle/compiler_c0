@@ -118,7 +118,7 @@ SymTab*& getGSymTab()
 // Front is the bottom
 deque<SymTab*> SymTabs;
 
-SymTabEntry* SymTab::find(const string& str)
+SymTabEntry* SymTab::find(const string& str) const
 {
     string lowercase = tolower(str);
     int i = this->_layer;

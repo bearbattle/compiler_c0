@@ -33,7 +33,7 @@ private:
     int _initVal;
     SymTab* _symTab;
     ParamTab* _paramTab;
-    int _length[2];
+    int _length[2]{ 0, 0 };
 public:
     SymTabEntry(const string& name, BaseType baseType, int line);
 
@@ -78,9 +78,9 @@ private:
     map<string, SymTabEntry*> _symTab;
     int _layer;
 public:
-    SymTab(int layer);
+    explicit SymTab(int layer);
 
-    SymTabEntry* find(const string& str);
+    SymTabEntry* find(const string& str) const;
 
     bool exist(const string& str, bool curLayer = false);
 
