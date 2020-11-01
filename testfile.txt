@@ -1,9 +1,0 @@
-char a = '\';
-char a = 'a';
-
-void main(){
-	char a;
-	int a;
-	printf("", b);
-	scanf(p);
-}
