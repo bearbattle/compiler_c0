@@ -14,6 +14,7 @@ out/
 
 # Test
 *.txt
+!CMakeList.txt
 
 # WSL Output
 compiler
