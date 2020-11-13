@@ -1230,7 +1230,6 @@ static BaseType returnCallStat()
         GetCurBaseType(ret);
         lexer::getToken();
         ACCEPT(LPARENT);
-        lexer::getToken();
         valueTable(curFuncParamTab);
         if (lexer::getTokenType() != RPARENT)
         {
