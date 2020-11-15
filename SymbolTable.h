@@ -34,8 +34,10 @@ private:
     SymTab* _symTab;
     ParamTab* _paramTab;
     int _length[2]{ 0, 0 };
+    bool _isGlobal;
+    unsigned int _address = 0;
 public:
-    SymTabEntry(const string& name, BaseType baseType, int line);
+    SymTabEntry(const string& name, BaseType baseType, int line, bool isGlobal = false);
 
     const string& getName() const;
 
@@ -70,6 +72,12 @@ public:
     int getLength(int dimension) const;
 
     void setLength(int dimension, int length);
+
+    bool isGlobal() const;
+
+    unsigned int getAddress() const;
+
+    void setAddress(unsigned int address);
 };
 
 class SymTab
@@ -85,6 +93,8 @@ public:
     bool exist(const string& str, bool curLayer = false);
 
     void addEntry(const string& name, SymTabEntry* entry, bool override = false);
+
+    const map<string, SymTabEntry*>& getSymTab() const;
 };
 
 class Param

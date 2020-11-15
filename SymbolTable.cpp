@@ -3,7 +3,7 @@
 #include "Error.h"
 
 
-SymTabEntry::SymTabEntry(const string& name, BaseType baseType, int line)
+SymTabEntry::SymTabEntry(const string& name, BaseType baseType, int line, bool isGlobal)
 {
     this->_name = tolower(name);
     this->_baseType = baseType;
@@ -14,6 +14,7 @@ SymTabEntry::SymTabEntry(const string& name, BaseType baseType, int line)
     this->_paramTab = nullptr;
     this->_line = line;
     this->_initVal = 0;
+    this->_isGlobal = isGlobal;
 }
 
 const string& SymTabEntry::getName() const
@@ -105,6 +106,21 @@ int SymTabEntry::getLine() const
     return _line;
 }
 
+bool SymTabEntry::isGlobal() const
+{
+    return _isGlobal;
+}
+
+unsigned int SymTabEntry::getAddress() const
+{
+    return _address;
+}
+
+void SymTabEntry::setAddress(unsigned int address)
+{
+    _address = address;
+}
+
 void initSymTabs()
 {
     SymTabs.push_back(new SymTab(0));
@@ -172,6 +188,11 @@ void SymTab::addEntry(const string& name, SymTabEntry* entry, bool override)
         errList.emplace_back(b, entry->getLine());
         // TODO: Check the line of Token()
     }
+}
+
+const map<string, SymTabEntry*>& SymTab::getSymTab() const
+{
+    return _symTab;
 }
 
 void ParamTab::addParam(BaseType type, const string& name)
