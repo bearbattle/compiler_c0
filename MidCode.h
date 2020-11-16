@@ -262,7 +262,12 @@ public:
 
     WriteMid(VarBase* var, bool isChar = false);
 
+    WriteMid();
+
     void out(std::ostream& os) const override;
+
+private:
+    static StringVar* newLine;
 };
 
 class FunctionEndMid : public MidCode

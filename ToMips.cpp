@@ -163,7 +163,12 @@ void toMips()
         case WRITE_MID:
         {
             auto* writeMid = (WriteMid*)midCode;
-            if (writeMid->isString)
+            if (writeMid->var == nullptr)
+            {
+                mipsFile << "li $v0, 11" << endl;
+                mipsFile << "la $a0, " << 10 << endl;
+            }
+            else if (writeMid->isString)
             {
                 mipsFile << "li $v0, 4" << endl;
                 mipsFile << "la $a0, " << ((StringVar*)(writeMid->var))->getLabel() << endl;
@@ -203,13 +208,13 @@ void toMips()
             break;
         }
     }
-    mipsFile << "li $a0, 10" << endl;
+    mipsFile << "li $v0, 10" << endl;
     mipsFile << "syscall" << endl;
 }
 
 void addTempVar(set<VarBase*>& tempVars, VarBase* pVar)
 {
-    if (pVar->varType != TEMPVAR)
+    if (pVar && pVar->varType != TEMPVAR)
     {
         return;
     }
@@ -253,10 +258,10 @@ void loadVar(VarBase* var, int reg)
         break;
     }
 #ifdef ARRAYSUPPORT
-    case ARRAY:
-    {
-        // TODO
-    }
+        case ARRAY:
+        {
+            // TODO
+        }
 #endif
     default:
     {
@@ -301,10 +306,10 @@ void storeVar(int reg, VarBase* var)
         break;
     }
 #ifdef ARRAYSUPPORT
-    case ARRAY:
-    {
-        // TODO
-    }
+        case ARRAY:
+        {
+            // TODO
+        }
 #endif
     default:
     {

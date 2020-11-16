@@ -52,7 +52,7 @@ void Var::out(ostream& os) const
 
 
 ArrayVar::ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript) : VarBase(ARRAY), symTabEntry(symTabEntry),
-subscript(subscript)
+                                                                   subscript(subscript)
 {
 }
 
@@ -143,13 +143,13 @@ void AssignMid::out(ostream& os) const
 }
 
 AssignMid::AssignMid(MidOp op, VarBase* left, VarBase* des) : MidCode(ASS_MID), op(op), left(left), right(nullptr),
-des(des)
+                                                              des(des)
 {
 }
 
 AssignMid::AssignMid(MidOp op, VarBase* left, VarBase* right, VarBase* des) : MidCode(ASS_MID), op(op),
-left(left), right(right),
-des(des)
+                                                                              left(left), right(right),
+                                                                              des(des)
 {
 }
 
@@ -187,9 +187,9 @@ void ReturnMid::out(ostream& os) const
 }
 
 BranchMid::BranchMid(MidOp op, VarBase* left, VarBase* right, BaseLabel* label) : MidCode(BRA_MID), op(op),
-left(left),
-right(right),
-label(label)
+                                                                                  left(left),
+                                                                                  right(right),
+                                                                                  label(label)
 {
 }
 
@@ -240,6 +240,10 @@ void ReadMid::out(ostream& os) const
     var->out(os);
 }
 
+WriteMid::WriteMid() : MidCode(WRITE_MID), var(nullptr), isChar(true)
+{
+}
+
 WriteMid::WriteMid(VarBase* var, bool isChar) : MidCode(WRITE_MID), var(var), isChar(isChar)
 {
     isString = typeid(*var) == typeid(StringVar);
@@ -248,7 +252,12 @@ WriteMid::WriteMid(VarBase* var, bool isChar) : MidCode(WRITE_MID), var(var), is
 void WriteMid::out(ostream& os) const
 {
     os << "write ";
-    if (typeid(*var) == typeid(StringVar))
+    if (var == nullptr)
+    {
+        os << "newline";
+        return;
+    }
+    else if (typeid(*var) == typeid(StringVar))
     {
         os << "string ";
     }
@@ -258,6 +267,7 @@ void WriteMid::out(ostream& os) const
     }
     var->out(os);
 }
+
 
 FunctionEndMid::FunctionEndMid() : MidCode(FUN_END_MID)
 {
