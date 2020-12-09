@@ -4,8 +4,6 @@
 
 #include "MidCode.h"
 
-#include <utility>
-
 VarBase::VarBase(VarType varType) : varType(varType)
 {
 }
@@ -51,8 +49,11 @@ void Var::out(ostream& os) const
 }
 
 
-ArrayVar::ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript) : VarBase(ARRAY), symTabEntry(symTabEntry),
-                                                                   subscript(subscript)
+ArrayVar::ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript, VarBase* subscript1) : VarBase(ARRAY),
+                                                                                        symTabEntry(
+                                                                                                symTabEntry),
+                                                                                        subscript(subscript),
+                                                                                        subscript1(subscript1)
 {
 }
 
@@ -61,6 +62,12 @@ void ArrayVar::out(ostream& os) const
     os << symTabEntry->getName() << "[";
     subscript->out(os);
     os << "]";
+    if (subscript1 != nullptr)
+    {
+        os << "[";
+        subscript1->out(os);
+        os << "]";
+    }
 }
 
 int BaseLabel::count = 0;
@@ -107,7 +114,7 @@ MidType MidCode::getType() const
     return type;
 }
 
-static map<MidOp, string> op2Str = {
+static map<MidOp, string> op2Str = { // NOLINT
         { ADD_OP, " + " },
         { SUB_OP, " - " },
         { MUL_OP, " * " },
@@ -193,7 +200,7 @@ BranchMid::BranchMid(MidOp op, VarBase* left, VarBase* right, BaseLabel* label) 
 {
 }
 
-static map<MidOp, string> op2Branch = {
+static map<MidOp, string> op2Branch = { // NOLINT
         { LSS_OP, "blt " },
         { LEQ_OP, "ble " },
         { GRE_OP, "bgt " },
@@ -240,7 +247,7 @@ void ReadMid::out(ostream& os) const
     var->out(os);
 }
 
-WriteMid::WriteMid() : MidCode(WRITE_MID), var(nullptr), isChar(true)
+WriteMid::WriteMid() : MidCode(WRITE_MID), var(nullptr), isChar(false), isString(false)
 {
 }
 
@@ -280,7 +287,7 @@ void FunctionEndMid::out(ostream& os) const
 
 vector<MidCode*> midCodes;
 
-map<TokenType, MidOp> MidOpMap = {
+map<TokenType, MidOp> MidOpMap = { // NOLINT
         { PLUS, ADD_OP },
         { MINU, SUB_OP },
         { MULT, MUL_OP },

@@ -79,8 +79,9 @@ class ArrayVar : public VarBase
 public:
     SymTabEntry* symTabEntry;
     VarBase* subscript;
+    VarBase* subscript1;
 
-    ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript);
+    ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript, VarBase* subscript1 = nullptr);
 
     void out(std::ostream& os) const override;
 };
@@ -281,5 +282,8 @@ public:
 extern vector<MidCode*> midCodes;
 
 extern ofstream midCodeFileInit;
+
+#define ARRAYSUPPORT
+#define FUNCTIONSUPPORT
 
 #endif //COMPILER_0_MIDCODE_H
