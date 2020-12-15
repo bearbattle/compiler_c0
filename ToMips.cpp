@@ -26,7 +26,6 @@ void globalInitialize(vector<MidCode*>::iterator iterator)
     {
         auto* assignMid = (AssignMid*)(*iterator);
 #ifdef DEBUG_OUTPUT
-        mipsFile << "# ";
         assignMid->out(mipsFile);
         mipsFile << endl;
 #endif
@@ -42,7 +41,7 @@ void globalInitialize(vector<MidCode*>::iterator iterator)
             }
             case SUB_OP:
             {
-                mipsFile << "sub $" << $t2 << ", $0, $" << $t0 << endl;
+                mipsFile << "subu $" << $t2 << ", $0, $" << $t0 << endl;
                 break;
             }
             default:
@@ -102,11 +101,11 @@ void toMips()
         else if (entry->getDimension() > 0) // array
         {
             int size = entry->getArraySize() * 4;
-            mipsFile << entry->getName() << ": .space " << size << endl;
+            mipsFile << "$global_" << entry->getName() << "__" << ": .space " << size << endl;
         }
         else
         {
-            mipsFile << entry->getName() << ": .word " << entry->getInitVal() << endl;
+            mipsFile << "$global_" << entry->getName() << "__" << ": .word " << entry->getInitVal() << endl;
         }
     }
     for (auto* pItem : StringVar::stringVars)
@@ -140,10 +139,10 @@ void toMips()
 //    }
     for (; it != midCodes.end(); it++)
     {
+
         curMiCodeLine = it - midCodes.begin();
         auto midCode = *it;
 #ifdef DEBUG_OUTPUT
-        mipsFile << "# ";
         midCode->out(mipsFile);
         mipsFile << endl;
 #endif
@@ -164,7 +163,7 @@ void toMips()
                 }
                 case SUB_OP:
                 {
-                    mipsFile << "sub $" << $t2 << ", $0, $" << $t0 << endl;
+                    mipsFile << "subu $" << $t2 << ", $0, $" << $t0 << endl;
                     break;
                 }
                 default:
@@ -223,6 +222,7 @@ void toMips()
             }
             else
             {
+                loadVar(writeMid->var, $a0);
                 if (writeMid->isChar)
                 {
                     mipsFile << "li $v0, 11" << endl;
@@ -231,7 +231,6 @@ void toMips()
                 {
                     mipsFile << "li $v0, 1" << endl;
                 }
-                loadVar(writeMid->var, $a0);
             }
             mipsFile << "syscall" << endl;
             break;
@@ -260,30 +259,35 @@ void toMips()
             // Push Params into Stack
             for (int i = 0; i < callMid->valTable.size(); i++)
             {
+#ifdef DEBUG_OUTPUT
+                mipsFile << "# Pushing param " << i << endl;
+#endif
                 loadVar(callMid->valTable[i], $a0);
                 int to_sp = i * 4;
                 mipsFile << "sw $a0, " << to_sp << "($sp)" << std::endl;
             }
             // NO NEED TO RESET REGS
             // UPDATE: NEED TO SAVE $t0 $t1 $t2 $t3 $t4 $t5
-            VarBase* savedVars[32];
+            /*VarBase* savedVars[32] = { nullptr };2
             for (int i = $t0; i <= $t5; i++)
             {
-                if (regVars[i])
+                if (regvars[i])
                 {
-                    savedVars[i] = regVars[i];
-                    storeVar(i, savedVars[i]);
+                    savedvars[i] = regvars[i];
+                    storevar(i, savedvars[i]);
                 }
-            }
+            }*/
             mipsFile << "jal " << callMid->symTabEntry->getName() << std::endl;
             // RESTORE REGS
-            for (int i = $t0; i <= $t5; i++)
+            /*for (int i = $t0; i <= $t5; i++)
             {
                 if (savedVars[i])
                 {
                     loadVar(savedVars[i], i);
                 }
-            }
+            }*/
+            mipsFile << "addiu $sp, $sp, " << callMid->valTable.size() * 4 + 16 << std::endl;
+            curStackSize -= callMid->valTable.size() * 4 + 16;
             break;
         }
         case RET_MID:
@@ -387,14 +391,29 @@ void toMips()
                 }
             }
             // LOAD ARGUMENTS
-            for (int i = 0; i < funcMid->symTabEntry->getParamTab()->params.size(); i++)
+            int argSize = funcMid->symTabEntry->getParamTab()->params.size();
+            int argBase = curStackSize;
+            for (int i = 0; i < argSize; i++)
             {
-                unsigned int to_sp = curStackSize - i * 4;
+                unsigned int to_sp = curStackSize + i * 4;
                 mipsFile << "lw $v1, " << to_sp << "($sp)" << endl;
-                storeVar($v1, new Var(funcMid->symTabEntry->getSymTab()->find(
+                /*storeVar($v1, new Var(funcMid->symTabEntry->getSymTab()->find(
                     funcMid->symTabEntry->getParamTab()->params[i].GetName()
                 )
-                ));
+                ));*/
+                for (const auto& e : funcMid->symTabEntry->getSymTab()->getSymTab())
+                {
+                    auto entry = e.second;
+                    if (entry->getName() == funcMid->symTabEntry->getParamTab()->params[i].GetName())
+                    {
+#ifdef DEBUG_OUTPUT
+                        mipsFile << "# Loading param " << i << " : " << funcMid->symTabEntry->getParamTab()->params[i].GetName() << endl;
+#endif
+                        unsigned int to_sp = curStackSize - entry->getAddress();
+                        mipsFile << "sw $v1, " << to_sp << "($sp)" << endl;
+                        break;
+                    }
+                }
             }
             break;
         }
@@ -424,6 +443,7 @@ void addTempVar(set<VarBase*>& vars, VarBase* pVar)
     if (pVar && pVar->varType == ARRAY)
     {
         auto* arrayVar = (ArrayVar*)pVar;
+        pVar = arrayVar->index;
     }
     if (pVar && pVar->varType != TEMPVAR)
     {
@@ -446,7 +466,7 @@ void loadVar(VarBase* var, int reg)
             //wrong;
         }
         long long to_sp = curStackSize + tempVar->offset;
-        mipsFile << "lw $" << reg << ", -" << to_sp << "($sp)" << endl;
+        mipsFile << "lw $" << reg << ", " << to_sp << "($sp)" << endl;
         break;
     }
     case BASEVAR:
@@ -454,12 +474,12 @@ void loadVar(VarBase* var, int reg)
         auto baseVar = (Var*)var;
         if (baseVar->symTabEntry->isGlobal())
         {
-            mipsFile << "lw $" << reg << ", " << baseVar->symTabEntry->getName() << endl;
+            mipsFile << "lw $" << reg << ", " << "$global_" << baseVar->symTabEntry->getName() << "__" << endl;
         }
         else
         {
             unsigned int offset = curStackSize - baseVar->symTabEntry->getAddress();
-            mipsFile << "lw $" << reg << ", -" << offset << "($sp)" << endl;
+            mipsFile << "lw $" << reg << ", " << offset << "($sp)" << endl;
         }
         break;
     }
@@ -474,6 +494,7 @@ void loadVar(VarBase* var, int reg)
     {
         auto arrayVar = (ArrayVar*)var;
         int offset = -1;
+        // offset
         if (arrayVar->index->varType == CONVAR)
         {
             auto constVar = (ConstVar*)(arrayVar->index);
@@ -484,22 +505,25 @@ void loadVar(VarBase* var, int reg)
             loadVar(arrayVar->index, $t4);
             mipsFile << "sll $" << $t4 << ", $" << $t4 << ", 2" << std::endl;
         }
+        else {
+            while (1);
+        }
         if (arrayVar->symTabEntry->isGlobal())
         {
-            if (offset > 0)
+            if (offset >= 0)
             {
-                mipsFile << "lw $" << reg << ", " << arrayVar->symTabEntry->getName() << "+" << offset << std::endl;
+                mipsFile << "lw $" << reg << ", " << "$global_" << arrayVar->symTabEntry->getName() << "__" << "+" << offset << std::endl;
             }
             else
             {
-                mipsFile << "lw $" << reg << ", " << arrayVar->symTabEntry->getName() << "($" << $t4 << ")"
+                mipsFile << "lw $" << reg << ", " << "$global_" << arrayVar->symTabEntry->getName() << "__" << "($" << $t4 << ")"
                     << std::endl;
             }
         }
         else
         {
             unsigned int to_sp = curStackSize - arrayVar->symTabEntry->getAddress();
-            if (offset > 0)
+            if (offset >= 0)
             {
                 mipsFile << "lw $" << reg << ", " << to_sp + offset << "($sp)" << std::endl;
             }
@@ -539,7 +563,7 @@ void storeVar(int reg, VarBase* var)
             //wrong;
         }
         long long offset = curStackSize + tempVar->offset;
-        mipsFile << "sw $" << reg << ", -" << offset << "($sp)" << endl;
+        mipsFile << "sw $" << reg << ", " << offset << "($sp)" << endl;
         break;
     }
     case BASEVAR:
@@ -547,12 +571,12 @@ void storeVar(int reg, VarBase* var)
         auto baseVar = (Var*)var;
         if (baseVar->symTabEntry->isGlobal())
         {
-            mipsFile << "sw $" << reg << ", " << baseVar->symTabEntry->getName() << endl;
+            mipsFile << "sw $" << reg << ", " << "$global_" << baseVar->symTabEntry->getName() << "__" << endl;
         }
         else
         {
             unsigned int offset = curStackSize - baseVar->symTabEntry->getAddress();
-            mipsFile << "sw $" << reg << ", -" << offset << "($sp)" << endl;
+            mipsFile << "sw $" << reg << ", " << offset << "($sp)" << endl;
         }
         break;
     }
@@ -578,20 +602,20 @@ void storeVar(int reg, VarBase* var)
         }
         if (arrayVar->symTabEntry->isGlobal())
         {
-            if (offset > 0)
+            if (offset >= 0)
             {
-                mipsFile << "sw $" << reg << ", " << arrayVar->symTabEntry->getName() << "+" << offset << std::endl;
+                mipsFile << "sw $" << reg << ", " << "$global_" << arrayVar->symTabEntry->getName() << "__" << "+" << offset << std::endl;
             }
             else
             {
-                mipsFile << "sw $" << reg << ", " << arrayVar->symTabEntry->getName() << "($" << $t4 << ")"
+                mipsFile << "sw $" << reg << ", " << "$global_" << arrayVar->symTabEntry->getName() << "__" << "($" << $t4 << ")"
                     << std::endl;
             }
         }
         else
         {
             unsigned int to_sp = curStackSize - arrayVar->symTabEntry->getAddress();
-            if (offset > 0)
+            if (offset >= 0)
             {
                 mipsFile << "sw $" << reg << ", " << to_sp + offset << "($sp)" << std::endl;
             }

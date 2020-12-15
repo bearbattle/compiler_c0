@@ -4,6 +4,9 @@
 
 #include "MidCode.h"
 
+#define DEBUG_OUTPUT
+
+
 VarBase::VarBase(VarType varType) : varType(varType)
 {
 }
@@ -69,13 +72,13 @@ symTabEntry(symTabEntry)
     {
         auto* sub = (ConstVar*)subscript;
         auto* sub1 = (ConstVar*)subscript1;
-        index = new ConstVar(sub->value * symTabEntry->getLength(1) + sub1->value);
+        index = new ConstVar(sub->value * symTabEntry->getLength(2) + sub1->value);
     }
     else
     {
         auto* t1 = new TempVar();
         midCodes.push_back(new AssignMid(MUL_OP, subscript,
-            new ConstVar(symTabEntry->getLength(1)),
+            new ConstVar(symTabEntry->getLength(2)),
             t1));
         auto* t2 = new TempVar();
         midCodes.push_back(new AssignMid(ADD_OP, t1,
@@ -135,6 +138,9 @@ static map<MidOp, string> op2Str = { // NOLINT
 
 void AssignMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     if (right == nullptr)
     {
         des->out(os);
@@ -170,10 +176,16 @@ void CallMid::out(ostream& os) const
 {
     for (auto item : valTable)
     {
+#ifdef DEBUG_OUTPUT
+        os << "# ";
+#endif
         os << "push ";
         item->out(os);
         os << endl;
     }
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << "call " << symTabEntry->getName();
 }
 
@@ -191,6 +203,9 @@ ReturnMid::ReturnMid() : MidCode(RET_MID), ret(nullptr), isVoid(true)
 
 void ReturnMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << "return";
     if (!isVoid)
     {
@@ -236,6 +251,9 @@ map<MidOp, string> op2Branch = { // NOLINT
 
 void BranchMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << op2Branch[op];
     left->out(os);
     os << ", ";
@@ -250,6 +268,9 @@ JumpMid::JumpMid(BaseLabel* label) : MidCode(JMP_MID), label(label)
 
 void JumpMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << "j " << label->label() << ":";
 }
 
@@ -259,6 +280,9 @@ FunctionMid::FunctionMid(SymTabEntry* symTabEntry) : MidCode(FUN_MID), symTabEnt
 
 void FunctionMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     bool first = true;
     os << symTabEntry->getName() << "(";
     for (auto item : symTabEntry->getParamTab()->params)
@@ -276,20 +300,26 @@ void FunctionMid::out(ostream& os) const
     os << ")" << endl;
     for (const auto& item : symTabEntry->getSymTab()->getSymTab())
     {
+#ifdef DEBUG_OUTPUT
+        os << "# ";
+#endif
         if (item.second->isConst())
         {
-            os << "# local var const " << item.first << " = " << item.second->getInitVal() << std::endl;
+            os << "local var const " << item.first << " = " << item.second->getInitVal() << std::endl;
         }
         else if (item.second->getDimension() > 0) // array
         {
-            os << "# local var array " << item.first << "[" << item.second->getArraySize() << "]" << std::endl;
+            os << "local var array " << item.first << "[" << item.second->getArraySize() << "]" << std::endl;
         }
         else
         {
-            os << "# local var " << item.first << " = " << item.second->getInitVal() << std::endl;
+            os << "local var " << item.first << " = " << item.second->getInitVal() << std::endl;
         }
     }
-    os << "# {";
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
+    os << "{";
 }
 
 ReadMid::ReadMid(Var* var) : MidCode(READ_MID), var(var)
@@ -298,6 +328,9 @@ ReadMid::ReadMid(Var* var) : MidCode(READ_MID), var(var)
 
 void ReadMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << "read ";
     var->out(os);
 }
@@ -313,6 +346,9 @@ WriteMid::WriteMid(VarBase* var, bool isChar) : MidCode(WRITE_MID), var(var), is
 
 void WriteMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << "write ";
     if (var == nullptr)
     {
@@ -337,6 +373,9 @@ FunctionEndMid::FunctionEndMid() : MidCode(FUN_END_MID)
 
 void FunctionEndMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << "}";
 }
 
@@ -432,6 +471,9 @@ LabelMid::LabelMid(BaseLabel* label) : MidCode(LAB_MID), label(label)
 
 void LabelMid::out(ostream& os) const
 {
+#ifdef DEBUG_OUTPUT
+    os << "# ";
+#endif
     os << label->label() << ":";
 }
 

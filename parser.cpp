@@ -287,8 +287,8 @@ Rparent:
         errList.emplace_back(h, lexer::prevToken);
     }
     isReturnFunc = false;
-    return;
     midCodes.push_back(new FunctionEndMid());
+    return;
     parseError();
 }
 
@@ -686,6 +686,7 @@ static void varDefWithInit()
                                                 }
                                                 if (lexer::getTokenType() == RBRACE)
                                                 {
+                                                    length[0]++;
                                                     CheckArray(2);
                                                     lexer::getToken();
                                                 }
@@ -1244,6 +1245,7 @@ RParent:
         lexer::getToken();
         stat();
     }
+    midCodes.push_back(new JumpMid(ifLabel->endLabel));
     midCodes.push_back(new LabelMid(ifLabel->endLabel));
     outputFile << "<条件语句>" << endl;
     return;
@@ -1281,6 +1283,7 @@ static BaseType returnCallStat()
         }
         lexer::getToken();
     Rparent:
+        midCodes.push_back(returnCall);
         outputFile << "<有返回值函数调用语句>" << endl;
         return ret;
     }
@@ -1310,6 +1313,7 @@ static void nonReturnCallStat()
         {
             lexer::getToken();
         Rparent:
+            midCodes.push_back(nonReturnCall);
             outputFile << "<无返回值函数调用语句>" << endl;
             return;
         }
@@ -1763,7 +1767,8 @@ static BaseType factor(VarBase*& var)
     if (isStat() == RETURNCALLSTAT)
     {
         ret = returnCallStat();
-        var = new RetVar();
+        var = new TempVar();
+        midCodes.push_back(new AssignMid(ADD_OP, new RetVar(), var));
         outputFile << "<因子>" << endl;
         return ret;
     }
