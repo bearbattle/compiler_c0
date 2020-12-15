@@ -61,16 +61,16 @@ static void returnStat();// Native: expr()
 // loopStat:
 //static void whileLoopStat(); // Native: condition(), stat()
 //static void forLoopStat(); // Native: condition(), <IDENFR>, expr(), +|-, step()
-static void condition(); // Native: expr(), relationOp()
-static void step(); // Native: unsignedInteger()
+static void condition(VarBase*& leftVar, MidOp& op, VarBase*& rightVar); // Native: expr(), relationOp()
+static int step(); // Native: unsignedInteger()
 
 // returnCallState, nonReturnCallState:
 static void valueTable(ParamTab* ptr_paramTab, CallMid* callMid); // Native: expr()
 
 // caseStat: expr()
-static void caseTable(BaseType caseType); // Native: caseSubStat()
-static void caseSubStat(BaseType caseType); // Native: constExpr(), stat()
-static void defaultStat(); // Native: stat()
+static void caseTable(BaseType caseType, SwitchLabel switchLabel); // Native: caseSubStat()
+static void caseSubStat(BaseType caseType, SwitchLabel switchLabel); // Native: constExpr(), stat()
+static void defaultStat(SwitchLabel switchLabel); // Native: stat()
 
 // Common Usage
 static int integer();// Native: +|- unsignedInteger()
@@ -150,8 +150,8 @@ void program()
         varDec();
     }
     while (lexer::getTokenType() == INTTK ||
-           lexer::getTokenType() == CHARTK ||
-           lexer::getTokenType() == VOIDTK)
+        lexer::getTokenType() == CHARTK ||
+        lexer::getTokenType() == VOIDTK)
     {
         if (lexer::getTokenType() == VOIDTK)
         {
@@ -275,6 +275,7 @@ static void returnFuncDef()
     }
     lexer::getToken();
 Rparent:
+    midCodes.push_back(new FunctionMid(newEntry));
     ACCEPT(LBRACE);
     compoundStat();
     ACCEPT(RBRACE);
@@ -287,6 +288,7 @@ Rparent:
     }
     isReturnFunc = false;
     return;
+    midCodes.push_back(new FunctionEndMid());
     parseError();
 }
 
@@ -319,6 +321,7 @@ static void nonReturnFuncDef()
         }
         lexer::getToken();
     Rparent:
+        midCodes.push_back(new FunctionMid(newEntry));
         ACCEPT(LBRACE);
         compoundStat();
         ACCEPT(RBRACE);
@@ -326,6 +329,7 @@ static void nonReturnFuncDef()
         newEntry->setSymTab(SymTabs[curLayer--]);
         SymTabs.pop_back();
         isNonReturnFunc = false;
+        midCodes.push_back(new FunctionEndMid());
         return;
     }
     parseError();
@@ -340,7 +344,7 @@ static void mainFunc()
     {
         // Add SymTab of void main()
         mainEntry = new
-                SymTabEntry("main", VOID,
+            SymTabEntry("main", VOID,
                 lexer::curToken->getLine());
         getGSymTab()->addEntry("main", mainEntry);
         SymTabs.push_back(new SymTab(++curLayer));
@@ -354,6 +358,9 @@ static void mainFunc()
         }
         lexer::getToken();
     Rparent:
+        mainEntry->setParamTab(new ParamTab());
+        mainEntry->setFunc(true);
+        midCodes.push_back(new FunctionMid(mainEntry));
         ACCEPT(LBRACE);
         compoundStat();
         ACCEPT(RBRACE);
@@ -361,6 +368,7 @@ static void mainFunc()
         mainEntry->setSymTab(SymTabs[curLayer--]);
         SymTabs.pop_back();
         isNonReturnFunc = false;
+        midCodes.push_back(new FunctionEndMid());
         return;
     }
 }
@@ -628,9 +636,9 @@ static void varDefWithInit()
                                     lexer::getToken();
                                     constType = constExpr(initVal);
                                     midCodes.push_back(new AssignMid(ADD_OP, initVal,
-                                            new ArrayVar(varEntry,
-                                                    new ConstVar(length[0]),
-                                                    new ConstVar(length[1]))));
+                                        new ArrayVar(varEntry,
+                                            new ConstVar(length[0]),
+                                            new ConstVar(length[1]))));
                                     CheckConstType;
                                     length[1]++;
                                     while (lexer::getTokenType() == COMMA)
@@ -638,9 +646,9 @@ static void varDefWithInit()
                                         lexer::getToken();
                                         constType = constExpr(initVal);
                                         midCodes.push_back(new AssignMid(ADD_OP, initVal,
-                                                new ArrayVar(varEntry,
-                                                        new ConstVar(length[0]),
-                                                        new ConstVar(length[1]))));
+                                            new ArrayVar(varEntry,
+                                                new ConstVar(length[0]),
+                                                new ConstVar(length[1]))));
                                         CheckConstType;
                                         length[1]++;
                                     }
@@ -660,9 +668,9 @@ static void varDefWithInit()
                                                 lexer::getToken();
                                                 constType = constExpr(initVal);
                                                 midCodes.push_back(new AssignMid(ADD_OP, initVal,
-                                                        new ArrayVar(varEntry,
-                                                                new ConstVar(length[0]),
-                                                                new ConstVar(length[1]))));
+                                                    new ArrayVar(varEntry,
+                                                        new ConstVar(length[0]),
+                                                        new ConstVar(length[1]))));
                                                 CheckConstType;
                                                 length[1]++;
                                                 while (lexer::getTokenType() == COMMA)
@@ -670,9 +678,9 @@ static void varDefWithInit()
                                                     lexer::getToken();
                                                     constType = constExpr(initVal);
                                                     midCodes.push_back(new AssignMid(ADD_OP, initVal,
-                                                            new ArrayVar(varEntry,
-                                                                    new ConstVar(length[0]),
-                                                                    new ConstVar(length[1]))));
+                                                        new ArrayVar(varEntry,
+                                                            new ConstVar(length[0]),
+                                                            new ConstVar(length[1]))));
                                                     CheckConstType;
                                                     length[1]++;
                                                 }
@@ -728,8 +736,8 @@ static void varDefWithInit()
                         lexer::getToken();
                         constType = constExpr(initVal);
                         midCodes.push_back(new AssignMid(ADD_OP, initVal,
-                                new ArrayVar(varEntry,
-                                        new ConstVar(length[0]))));
+                            new ArrayVar(varEntry,
+                                new ConstVar(length[0]))));
                         CheckConstType;
                         length[0]++;
                         while (lexer::getTokenType() == COMMA)
@@ -737,8 +745,8 @@ static void varDefWithInit()
                             lexer::getToken();
                             constType = constExpr(initVal);
                             midCodes.push_back(new AssignMid(ADD_OP, initVal,
-                                    new ArrayVar(varEntry,
-                                            new ConstVar(length[0]))));
+                                new ArrayVar(varEntry,
+                                    new ConstVar(length[0]))));
                             CheckConstType;
                             length[0]++;
                         }
@@ -754,22 +762,21 @@ static void varDefWithInit()
         }
         else
 #endif
-        if (lexer::getTokenType() == ASSIGN)
-        { // Dimension 0 Right
-            lexer::getToken();
-            VarBase* initVal;
-            constType = constExpr(initVal);
-            CheckConstType;
-            varEntry->setInitVal(((ConstVar*)initVal)->value);
-            if (curLayer != 0)
-            {
-                midCodes.push_back(new AssignMid(ADD_OP, initVal, var));
+            if (lexer::getTokenType() == ASSIGN)
+            { // Dimension 0 Right
+                lexer::getToken();
+                constType = constExpr(initVal);
+                CheckConstType;
+                varEntry->setInitVal(((ConstVar*)initVal)->value);
+                if (curLayer != 0)
+                {
+                    midCodes.push_back(new AssignMid(ADD_OP, initVal, var));
+                }
             }
-        }
-        else
-        {
-            parseError();
-        }
+            else
+            {
+                parseError();
+            }
     }
     outputFile << "<变量定义及初始化>" << endl;
 }
@@ -814,8 +821,8 @@ static void paramTable()
             paramName = lexer::curToken->getStr();
             curParamTab->addParam(paramType, paramName);
             SymTabs[curLayer]->addEntry(paramName,
-                    new SymTabEntry(paramName, paramType,
-                            lexer::curToken->getLine()));
+                new SymTabEntry(paramName, paramType,
+                    lexer::curToken->getLine()));
             lexer::getToken();
             while (lexer::getTokenType() == COMMA)
             {
@@ -826,8 +833,8 @@ static void paramTable()
                     paramName = lexer::curToken->getStr();
                     curParamTab->addParam(paramType, paramName);
                     SymTabs[curLayer]->addEntry(paramName,
-                            new SymTabEntry(paramName, paramType,
-                                    lexer::curToken->getLine()));
+                        new SymTabEntry(paramName, paramType,
+                            lexer::curToken->getLine()));
                     lexer::getToken();
                 }
                 else
@@ -1086,25 +1093,30 @@ static void stat()
 
 static void loopStat()
 {
+    LoopLabel loopLabel;
     if (lexer::getTokenType() == WHILETK)
     {
+        midCodes.push_back(new LabelMid(loopLabel.beginLabel));
         lexer::getToken();
-        if (lexer::getTokenType() == LPARENT)
+        ACCEPT(LPARENT);
+        lexer::getToken();
+        VarBase* leftVar, * rightVar;
+        MidOp op;
+        condition(leftVar, op, rightVar);
+        if (lexer::getTokenType() != RPARENT)
         {
-            lexer::getToken();
-            condition();
-            if (lexer::getTokenType() != RPARENT)
-            {
-                RparentExpected;
-                goto Rparent1;
-            }
-            lexer::getToken();
-        Rparent1:
-            stat();
-            outputFile << "<循环语句>" << endl;
-            return;
-
+            RparentExpected;
+            goto Rparent1;
         }
+        lexer::getToken();
+    Rparent1:
+        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel.endLabel));
+        stat();
+        midCodes.push_back(new JumpMid(loopLabel.beginLabel));
+        midCodes.push_back(new LabelMid(loopLabel.endLabel));
+        outputFile << "<循环语句>" << endl;
+        return;
+
     }
     else if (lexer::getTokenType() == FORTK)
     {
@@ -1116,6 +1128,8 @@ static void loopStat()
             return;
         }
         CheckUndefinedIdentifier;
+        SymTabEntry* loopVarEntry = SymTabs[curLayer]->find(lexer::curToken->getStr());
+        Var* loopVar = new Var(loopVarEntry);
         lexer::getToken();
         ACCEPT(ASSIGN);
         VarBase* loopInit;
@@ -1128,7 +1142,10 @@ static void loopStat()
         }
         lexer::getToken();
     semicn1:
-        condition();
+        midCodes.push_back(new AssignMid(ADD_OP, loopInit, loopVar));
+        VarBase* leftVar, * rightVar;
+        MidOp op;
+        condition(leftVar, op, rightVar);
         if (lexer::getTokenType() != SEMICN)
         {
             SemicnExpected;
@@ -1137,12 +1154,15 @@ static void loopStat()
         }
         lexer::getToken();
     semicn2:
+        midCodes.push_back(new LabelMid(loopLabel.beginLabel));
+        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel.endLabel));
         if (lexer::getTokenType() != IDENFR)
         {
             parseError();
             return;
         }
         CheckUndefinedIdentifier;
+        SymTabEntry* updateEntryLeft = SymTabs[curLayer]->find(lexer::curToken->getStr());
         lexer::getToken();
         ACCEPT(ASSIGN);
         if (lexer::getTokenType() != IDENFR)
@@ -1151,12 +1171,14 @@ static void loopStat()
             return;
         }
         CheckUndefinedIdentifier;
+        SymTabEntry* updateEntryRight = SymTabs[curLayer]->find(lexer::curToken->getStr());
         lexer::getToken();
         if (lexer::getTokenType() == PLUS ||
             lexer::getTokenType() == MINU)
         {
+            MidOp updateOp = MidOpMap[lexer::getTokenType()];
             lexer::getToken();
-            step();
+            int num = step();
             if (lexer::getTokenType() != RPARENT)
             {
                 RparentExpected;
@@ -1165,10 +1187,37 @@ static void loopStat()
             lexer::getToken();
         Rparent2:
             stat();
+            midCodes.push_back(new AssignMid(updateOp,
+                new Var(updateEntryRight), new ConstVar(num),
+                new Var(updateEntryLeft)));
+            midCodes.push_back(new JumpMid(loopLabel.beginLabel));
+            midCodes.push_back(new LabelMid(loopLabel.endLabel));
             outputFile << "<循环语句>" << endl;
             return;
         }
-
+    }
+    else if (lexer::getTokenType() == DOTK)
+    {
+        midCodes.push_back(new LabelMid(loopLabel.beginLabel));
+        lexer::getToken();
+        stat();
+        ACCEPT(WHILETK);
+        ACCEPT(LPARENT);
+        lexer::getToken();
+        VarBase* leftVar, * rightVar;
+        MidOp op;
+        condition(leftVar, op, rightVar);
+        if (lexer::getTokenType() != RPARENT)
+        {
+            RparentExpected;
+            goto Rparent3;
+        }
+        lexer::getToken();
+    Rparent3:
+        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel.beginLabel, true));
+        midCodes.push_back(new LabelMid(loopLabel.endLabel));
+        outputFile << "<循环语句>" << endl;
+        return;
     }
     parseError();
 }
@@ -1177,7 +1226,11 @@ static void ifStat()
 {
     ACCEPT(IFTK);
     ACCEPT(LPARENT);
-    condition();
+    IfLabel ifLabel;
+    VarBase* leftVar, * rightVar;
+    MidOp op;
+    condition(leftVar, op, rightVar);
+    midCodes.push_back(new BranchMid(op, leftVar, rightVar, ifLabel.elseLabel));
     if (lexer::getTokenType() != RPARENT)
     {
         RparentExpected;
@@ -1186,11 +1239,14 @@ static void ifStat()
     lexer::getToken();
 RParent:
     stat();
+    midCodes.push_back(new JumpMid(ifLabel.endLabel));
+    midCodes.push_back(new LabelMid(ifLabel.elseLabel));
     if (lexer::getTokenType() == ELSETK)
     {
         lexer::getToken();
         stat();
     }
+    midCodes.push_back(new LabelMid(ifLabel.endLabel));
     outputFile << "<条件语句>" << endl;
     return;
     parseError();
@@ -1315,7 +1371,7 @@ static void assignStat()
                             lexer::getToken();
                             expr(assignVal);
                             midCodes.push_back(new AssignMid(ADD_OP, assignVal,
-                                    new ArrayVar(entry, subscript, subscript1)));
+                                new ArrayVar(entry, subscript, subscript1)));
                             outputFile << "<赋值语句>" << endl;
                             return;
                         }
@@ -1326,7 +1382,7 @@ static void assignStat()
                     lexer::getToken();
                     expr(assignVal);
                     midCodes.push_back(new AssignMid(ADD_OP, assignVal,
-                            new ArrayVar(entry, subscript)));
+                        new ArrayVar(entry, subscript)));
                     outputFile << "<赋值语句>" << endl;
                     return;
                 }
@@ -1334,14 +1390,14 @@ static void assignStat()
         }
         else
 #endif
-        if (lexer::getTokenType() == ASSIGN)
-        { // Dimension 0 Right
-            lexer::getToken();
-            expr(assignVal);
-            midCodes.push_back(new AssignMid(ADD_OP, assignVal, var));
-            outputFile << "<赋值语句>" << endl;
-            return;
-        }
+            if (lexer::getTokenType() == ASSIGN)
+            { // Dimension 0 Right
+                lexer::getToken();
+                expr(assignVal);
+                midCodes.push_back(new AssignMid(ADD_OP, assignVal, var));
+                outputFile << "<赋值语句>" << endl;
+                return;
+            }
     }
     parseError();
 }
@@ -1439,11 +1495,12 @@ static void caseStat()
     }
     lexer::getToken();
 Rparent:
+    SwitchLabel switchLabel(caseVar);
     ACCEPT(LBRACE);
-    caseTable(caseType);
+    caseTable(caseType, switchLabel);
     if (lexer::getTokenType() == DEFAULTTK)
     {
-        defaultStat();
+        defaultStat(switchLabel);
     }
     else
     {
@@ -1457,7 +1514,7 @@ Rparent:
 
 static void returnStat()
 {
-    VarBase* retVar;
+    VarBase* retVar = nullptr;
     BaseType ret = UNDEF;
     ACCEPT(RETURNTK);
     if (lexer::getTokenType() == LPARENT)
@@ -1501,20 +1558,20 @@ static void returnStat()
         returnCount++;
         errList.emplace_back(h, lexer::prevToken->getLine());
     }
+    midCodes.push_back(new ReturnMid());
     return;
     parseError();
 }
 
-static void condition()
+static void condition(VarBase*& leftVar, MidOp& op, VarBase*& rightVar)
 {
     BaseType left, right;
-    VarBase* leftVar, * rightVar;
     left = expr(leftVar);
     if (left != INT)
     {
         errList.emplace_back(f, lexer::prevToken->getLine());
     }
-    relationOp();
+    op = relationOp();
     right = expr(rightVar);
     if (right != INT)
     {
@@ -1524,10 +1581,11 @@ static void condition()
 
 }
 
-static void step()
+static int step()
 {
-    unsignedInteger();
+    int ret = unsignedInteger();
     outputFile << "<步长>" << endl;
+    return ret;
 }
 
 static void valueTable(ParamTab* paramTab, CallMid* callMid)
@@ -1553,11 +1611,11 @@ static void valueTable(ParamTab* paramTab, CallMid* callMid)
     paramTab->checkParams(valueTable, lexer::curToken->getLine());
 }
 
-static void caseTable(BaseType caseType)
+static void caseTable(BaseType caseType, SwitchLabel switchLabel)
 {
     do
     {
-        caseSubStat(caseType);
+        caseSubStat(caseType, switchLabel);
     } while (isCaseSubStat());
     outputFile << "<情况表>" << endl;
 }
@@ -1567,23 +1625,27 @@ static bool isCaseSubStat()
     return lexer::getTokenType() == CASETK;
 }
 
-static void caseSubStat(BaseType caseType)
+static void caseSubStat(BaseType caseType, SwitchLabel switchLabel)
 {
+    midCodes.push_back(new LabelMid(switchLabel.curCaseLabel()));
     BaseType constType;
     ACCEPT(CASETK);
     VarBase* caseSubVar;
     constType = constExpr(caseSubVar);
     CheckCaseType;
     ACCEPT(COLON);
+    midCodes.push_back(new BranchMid(NEQ_OP,
+        switchLabel.caseVar, caseSubVar,
+        switchLabel.nextCaseLabel(), false));
     stat();
     outputFile << "<情况子语句>" << endl;
 }
 
-static void defaultStat()
+static void defaultStat(SwitchLabel switchLabel)
 {
+    midCodes.push_back(new LabelMid(switchLabel.curCaseLabel()));
     ACCEPT(DEFAULTTK);
     ACCEPT(COLON);
-    lexer::getToken();
     stat();
     outputFile << "<缺省>" << endl;
 }
@@ -1655,7 +1717,7 @@ static BaseType expr(VarBase*& var)
         curVar = tempVar;
     }
     while (lexer::getTokenType() == PLUS ||
-           lexer::getTokenType() == MINU)
+        lexer::getTokenType() == MINU)
     {
         MidOp termOp = MidOpMap[lexer::getTokenType()];
         ret = INT;
@@ -1676,7 +1738,7 @@ static BaseType term(VarBase*& var)
     VarBase* curVar;
     BaseType ret = factor(curVar);
     while (lexer::getTokenType() == MULT ||
-           lexer::getTokenType() == DIV)
+        lexer::getTokenType() == DIV)
     {
         MidOp factorOp = MidOpMap[lexer::getTokenType()];
         ret = INT;
@@ -1701,6 +1763,7 @@ static BaseType factor(VarBase*& var)
     if (isStat() == RETURNCALLSTAT)
     {
         ret = returnCallStat();
+        var = new RetVar();
         outputFile << "<因子>" << endl;
         return ret;
     }
@@ -1772,8 +1835,8 @@ static BaseType factor(VarBase*& var)
         return ret;
     }
     else if (lexer::getTokenType() == PLUS ||
-             lexer::getTokenType() == MINU ||
-             lexer::getTokenType() == INTCON)
+        lexer::getTokenType() == MINU ||
+        lexer::getTokenType() == INTCON)
     {
         var = new ConstVar(integer());
         outputFile << "<因子>" << endl;

@@ -9,6 +9,7 @@
 #include <queue>
 #include <map>
 #include <set>
+#include <stack>
 #include "SymbolTable.h"
 #include "Token.h"
 
@@ -78,8 +79,7 @@ class ArrayVar : public VarBase
 {
 public:
     SymTabEntry* symTabEntry;
-    VarBase* subscript;
-    VarBase* subscript1;
+    VarBase* index;
 
     ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript, VarBase* subscript1 = nullptr);
 
@@ -110,32 +110,99 @@ private:
 class BaseLabel
 {
 public:
-    BaseLabel();
+    explicit BaseLabel(bool inc = true);
 
-    string label() const;
+    virtual string label() const;
 
-private:
+protected:
     static int count;
     int id;
 };
 
-//class LoopLabel : BaseLabel
-//{
-//public:
-//    LoopLabel();
-//
-//    string headLabel() const;
-//
-//    string testLabel() const;
-//
-//    string bodyLabel() const;
-//
-//    string endLabel() const;
-//
-//private:
-//    static int count;
-//    int id;
-//};
+class IfLabel;
+
+class ElseLabel;
+
+class EndLabel;
+
+class IfLabel : public BaseLabel
+{
+public:
+    IfLabel();
+
+    string label() const override;
+
+    BaseLabel* elseLabel;
+
+    BaseLabel* endLabel;
+};
+
+class ElseLabel : public BaseLabel
+{
+public:
+    ElseLabel();
+
+    string label() const override;
+};
+
+class BeginLabel : public BaseLabel
+{
+public:
+    BeginLabel();
+
+    string label() const override;
+
+};
+
+class EndLabel : public BaseLabel
+{
+public:
+    EndLabel();
+
+    string label() const override;
+
+};
+
+class LoopLabel : public BaseLabel
+{
+public:
+    LoopLabel();
+
+    BaseLabel* beginLabel;
+    BaseLabel* endLabel;
+};
+
+class SwitchLabel;
+
+class CaseLabel;
+
+class CaseLabel : public BaseLabel
+{
+public:
+    explicit CaseLabel(SwitchLabel* switchLabel, long id);
+
+    SwitchLabel* switchLabel;
+
+    string label() const override;
+
+private:
+    long id;
+};
+
+class SwitchLabel : public BaseLabel
+{
+public:
+    explicit SwitchLabel(VarBase* caseVar);
+
+    VarBase* caseVar;
+    stack<CaseLabel*> caseLabels;
+
+    CaseLabel* curCaseLabel();
+
+    CaseLabel* nextCaseLabel();
+
+    string label() const override;
+};
 
 enum MidType
 {
@@ -173,6 +240,8 @@ enum MidOp
 };
 
 extern map<TokenType, MidOp> MidOpMap;
+
+extern map<MidOp, string> op2Branch;
 
 class AssignMid : public MidCode
 {
@@ -219,7 +288,7 @@ public:
     VarBase* left, * right;
     BaseLabel* label;
 
-    BranchMid(MidOp op, VarBase* left, VarBase* right, BaseLabel* label);
+    BranchMid(MidOp op, VarBase* left, VarBase* right, BaseLabel* label, bool reverse = true);
 
     void out(ostream& os) const override;
 };
@@ -230,6 +299,16 @@ public:
     BaseLabel* label;
 
     explicit JumpMid(BaseLabel* label);
+
+    void out(ostream& os) const override;
+};
+
+class LabelMid : public MidCode
+{
+public:
+    BaseLabel* label;
+
+    explicit LabelMid(BaseLabel* label);
 
     void out(ostream& os) const override;
 };

@@ -18,7 +18,8 @@ enum TokenType {
     PLUS, MINU, MULT, DIV,
     LSS, LEQ, GRE, GEQ, EQL, NEQ,
     COLON, ASSIGN, SEMICN, COMMA,
-    LPARENT, RPARENT, LBRACK, RBRACK, LBRACE, RBRACE
+    LPARENT, RPARENT, LBRACK, RBRACK, LBRACE, RBRACE,
+    DOTK,
 };
 
 // Map the token type to string

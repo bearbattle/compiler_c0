@@ -13,6 +13,13 @@ enum BaseType
     UNDEF, INT, CHAR, VOID
 };
 
+static map<BaseType, string> baseTypeOut = { // NOLINT
+        { UNDEF, "UNDEFINED" },
+        { INT,   "int" },
+        { CHAR,  "char" },
+        { VOID,  "void" },
+};
+
 class SymTabEntry;
 
 class SymTab;
@@ -78,6 +85,8 @@ public:
     unsigned int getAddress() const;
 
     void setAddress(unsigned int address);
+
+    int getArraySize() const;
 };
 
 class SymTab
@@ -106,13 +115,17 @@ public:
     Param(BaseType type, const string& name);
 
     BaseType getType() const;
+
+    friend ostream& operator<<(ostream& out, Param& A);
+
+    const string& GetName() const;
 };
 
 class ParamTab
 {
-private:
-    vector<Param> params;
 public:
+    vector<Param> params;
+
     void addParam(BaseType type, const string& name);
 
     void checkParams(const vector<BaseType>& valTable, int line);

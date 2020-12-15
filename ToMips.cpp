@@ -5,53 +5,85 @@ static void loadVar(VarBase* var, int reg);
 
 static void storeVar(int reg, VarBase* var);
 
-void addTempVar(set<VarBase*>& tempVars, VarBase* pVar);
+void addTempVar(set<VarBase*>& vars, VarBase* pVar);
 
 static vector<set<VarBase*>> tempVars;
 
 static int curMiCodeLine;
 static unsigned int curStackSize = 0;
 
+static void loadTempVars();
+
+static VarBase* regVars[32];
+
+void globalInitialize(vector<MidCode*>::iterator iterator)
+{
+    curStackSize = 0;
+    curStackSize += 4;
+    while (iterator != midCodes.end() && (*iterator)->getType() == ASS_MID)
+    {
+        auto* assignMid = (AssignMid*)(*iterator);
+        if (assignMid->right == nullptr)
+        {
+            loadVar(assignMid->left, $t0);
+            switch (assignMid->op)
+            {
+            case ADD_OP:
+            {
+                mipsFile << "move $" << $t2 << ", $" << $t0 << endl;
+                break;
+            }
+            case SUB_OP:
+            {
+                mipsFile << "sub $" << $t2 << ", $0, $" << $t0 << endl;
+                break;
+            }
+            default:
+            {
+                break;
+            }
+            }
+        }
+        else
+        {
+            loadVar(assignMid->left, $t0);
+            loadVar(assignMid->right, $t1);
+            switch (assignMid->op)
+            {
+            case ADD_OP:
+            {
+                mipsFile << "addu $" << $t2 << ", $" << $t0 << ", $" << $t1 << endl;
+                break;
+            }
+            case SUB_OP:
+            {
+                mipsFile << "subu $" << $t2 << ", $" << $t0 << ", $" << $t1 << endl;
+                break;
+            }
+            case MUL_OP:
+            {
+                mipsFile << "mul $" << $t2 << ", $" << $t0 << ", $" << $t1 << endl;
+                break;
+            }
+            case DIV_OP:
+            {
+                mipsFile << "div $" << $t0 << ", $" << $t1 << std::endl;
+                mipsFile << "mflo $" << $t2 << std::endl;
+                break;
+            }
+            default:
+                // TODO: Implementation
+                break;
+            }
+        }
+        storeVar($t2, assignMid->des);
+        iterator++;
+    }
+}
+
 void toMips()
 {
-    tempVars.resize(midCodes.size());
-    for (int i = 0; i < midCodes.size(); i++)
-    {
-        if (i > 0)
-        {
-            tempVars[i] = tempVars[i - 1];
-        }
-        auto midCode = midCodes[i];
-        switch (midCode->getType())
-        {
-        case ASS_MID:
-        {
-            auto* assignMid = (AssignMid*)midCode;
-            addTempVar(tempVars[i], assignMid->left);
-            if (assignMid->right != nullptr)
-            {
-                addTempVar(tempVars[i], assignMid->right);
-            }
-            addTempVar(tempVars[i], assignMid->des);
-            break;
-        }
-        case WRITE_MID:
-        {
-            auto* writeMid = (WriteMid*)midCode;
-            addTempVar(tempVars[i], writeMid->var);
-            break;
-        }
-        case READ_MID:
-        {
-            auto* readMid = (ReadMid*)midCode;
-            //            addTempVar(tempVars[i], readMid->var);
-            break;
-        }
-        default:
-            break;
-        }
-
-    }
+    loadTempVars();
     mipsFile << ".data" << std::endl;
     for (const auto& e : getGSymTab()->getSymTab())
     {
@@ -62,7 +94,8 @@ void toMips()
         }
         else if (entry->getDimension() > 0) // array
         {
-            // TODO: Array
+            int size = entry->getArraySize() * 4;
+            mipsFile << entry->getName() << ": .space " << size << endl;
         }
         else
         {
@@ -74,28 +107,31 @@ void toMips()
         mipsFile << pItem->getLabel() << ": .asciiz \t" << pItem->getStr() << endl;
     }
     mipsFile << ".text" << endl;
-    //    mipsFile << "jal main" << endl;
-    //    mipsFile << "li $v0 10" << endl;
-    //    mipsFile << "syscall" << endl;
+    // TO Initialize Global Vars
+    auto it = midCodes.begin();
+    globalInitialize(it);
+    mipsFile << "jal main" << endl;
+    mipsFile << "li $v0 10" << endl;
+    mipsFile << "syscall" << endl;
     //    curStackSize = TempVar::count * 4;
-    for (const auto& item : getGSymTab()->find("main")->getSymTab()->getSymTab())
-    {
-        auto entry = item.second;
-        if (entry->isFunc()) // Function
-        {
-            // TODO: function generation
-        }
-        else if (entry->getDimension() > 0) // array
-        {
-            // TODO: Array
-        }
-        else
-        {
-            curStackSize += 4;
-            entry->setAddress(curStackSize);
-        }
-    }
-    for (auto it = midCodes.begin(); it != midCodes.end(); it++)
+//    for (const auto& item : getGSymTab()->find("main")->getSymTab()->getSymTab())
+//    {
+//        auto entry = item.second;
+//        if (entry->isFunc()) // Function
+//        {
+//            // TODO: function generation
+//        }
+//        else if (entry->getDimension() > 0) // array
+//        {
+//            // TODO: Array
+//        }
+//        else
+//        {
+//            curStackSize += 4;
+//            entry->setAddress(curStackSize);
+//        }
+//    }
+    for (; it != midCodes.end(); it++)
     {
         curMiCodeLine = it - midCodes.begin();
         auto midCode = *it;
@@ -133,12 +169,12 @@ void toMips()
                 {
                 case ADD_OP:
                 {
-                    mipsFile << "add $" << $t2 << ", $" << $t0 << ", $" << $t1 << endl;
+                    mipsFile << "addu $" << $t2 << ", $" << $t0 << ", $" << $t1 << endl;
                     break;
                 }
                 case SUB_OP:
                 {
-                    mipsFile << "sub $" << $t2 << ", $" << $t0 << ", $" << $t1 << endl;
+                    mipsFile << "subu $" << $t2 << ", $" << $t0 << ", $" << $t1 << endl;
                     break;
                 }
                 case MUL_OP:
@@ -204,25 +240,189 @@ void toMips()
             storeVar($t3, readMid->var);
             break;
         }
+        case CALL_MID:
+        {
+            auto* callMid = (CallMid*)midCode;
+            mipsFile << "addiu $sp, $sp, -" << callMid->valTable.size() * 4 + 16 << std::endl;
+            curStackSize += callMid->valTable.size() * 4 + 16;
+            // Push Params into Stack
+            for (int i = 0; i < callMid->valTable.size(); i++)
+            {
+                loadVar(callMid->valTable[i], $a0);
+                int to_sp = i * 4;
+                mipsFile << "sw $a0, " << to_sp << "($sp)" << std::endl;
+            }
+            // NO NEED TO RESET REGS
+            // UPDATE: NEED TO SAVE $t0 $t1 $t2 $t3 $t4 $t5
+            VarBase* savedVars[32];
+            for (int i = $t0; i <= $t5; i++)
+            {
+                if (regVars[i])
+                {
+                    savedVars[i] = regVars[i];
+                    storeVar(i, savedVars[i]);
+                }
+            }
+            mipsFile << "jal " << callMid->symTabEntry->getName() << std::endl;
+            // RESTORE REGS
+            for (int i = $t0; i <= $t5; i++)
+            {
+                if (savedVars[i])
+                {
+                    loadVar(savedVars[i], i);
+                }
+            }
+            break;
+        }
+        case RET_MID:
+        {
+            auto* retMid = (ReturnMid*)midCode;
+            if (!retMid->isVoid)
+            {
+                loadVar(retMid->ret, $t5);
+                mipsFile << "move $v0, $" << $t5 << endl;
+            }
+            mipsFile << "addiu $sp, $sp, " << curStackSize << std::endl;
+            mipsFile << "lw $ra, -4($sp)" << std::endl;
+            mipsFile << "jr $ra" << std::endl;
+            break;
+        }
+        case BRA_MID:
+        {
+            auto* braMid = (BranchMid*)midCode;
+            loadVar(braMid->left, $t1);
+            loadVar(braMid->right, $t2);
+            mipsFile << op2Branch[braMid->op] << "$" << $t1 << ", $" << $t2 << ", __LABEL__" << braMid->label->label() << endl;
+            break;
+        }
+        case JMP_MID:
+        {
+            auto* jumpMid = (JumpMid*)midCode;
+            mipsFile << "j __LABEL__" << jumpMid->label->label() << endl;
+            break;
+        }
+        case LAB_MID:
+        {
+            auto* labMid = (LabelMid*)midCode;
+            mipsFile << "__LABEL__" << labMid->label->label() << ":" << endl;
+            break;
+        }
+        case FUN_MID:
+        {
+            auto* funcMid = (FunctionMid*)midCode;
+            for (auto& regVar : regVars)
+            {
+                regVar = nullptr;
+            }
+            curStackSize = 0;
+            curStackSize += 4;
+            mipsFile << funcMid->symTabEntry->getName() << ":" << endl;
+            mipsFile << "sw $ra, -4($sp)" << endl;
+            for (const auto& e : funcMid->symTabEntry->getSymTab()->getSymTab())
+            {
+                auto entry = e.second;
+                if (entry->isFunc()) // Function
+                {
+                    // TODO: function generation
+                }
+                else if (entry->getDimension() > 0) // array
+                {
+                    curStackSize += entry->getArraySize() * 4;
+                    entry->setAddress(curStackSize);
+                }
+                else
+                {
+                    curStackSize += 4;
+                    entry->setAddress(curStackSize);
+                }
+            }
+            for (auto sub_it = it; (*sub_it)->getType() != FUN_END_MID; sub_it++)
+            {
+                auto subMidCode = *sub_it;
+                bool flag = false;
+                VarBase* varBase;
+                if (subMidCode->getType() == ASS_MID)
+                {
+                    flag = true;
+                    auto assignMid = (AssignMid*)subMidCode;
+                    varBase = assignMid->des;
+                }
+                //                    else if (subMidCode->getType() == READ_MID)
+                //                    {
+                //                        flag = true;
+                //                        auto readMid = (ReadMid*)subMidCode;
+                //                        varBase = readMid->var;
+                //                    }
+                if (flag && varBase->varType == TEMPVAR)
+                {
+                    auto temp = (TempVar*)varBase;
+                    if (temp->offset == 0)
+                    {
+                        curStackSize += 4;
+                        temp->offset = -curStackSize;
+                    }
+                }
+            }
+            mipsFile << "addiu $sp, $sp, -" << curStackSize << endl;
+            for (const auto& e : funcMid->symTabEntry->getSymTab()->getSymTab())
+            {
+                auto entry = e.second;
+                if (!entry->isFunc() && entry->getDimension() == 0)
+                {
+                    unsigned int to_sp = curStackSize - entry->getAddress();
+                    mipsFile << "li $v1, " << entry->getInitVal() << endl;
+                    mipsFile << "sw $v1, " << to_sp << "($sp)" << endl;
+                }
+            }
+            // LOAD ARGUMENTS
+            for (int i = 0; i < funcMid->symTabEntry->getParamTab()->params.size(); i++)
+            {
+                unsigned int to_sp = curStackSize - i * 4;
+                mipsFile << "lw $v1, " << to_sp << "($sp)" << endl;
+                storeVar($v1, new Var(funcMid->symTabEntry->getSymTab()->find(
+                    funcMid->symTabEntry->getParamTab()->params[i].GetName()
+                )
+                ));
+            }
+            break;
+        }
+        case FUN_END_MID:
+        {
+            // STORE
+            for (int i = 0; i < 32; i++)
+            {
+                if (regVars[i])
+                {
+                    storeVar(i, regVars[i]);
+                }
+            }
+            mipsFile << "addiu $sp, $sp, " << curStackSize << endl;
+            mipsFile << "lw $ra, -4($sp)" << std::endl;
+            mipsFile << "jr $ra" << std::endl;
+            break;
+        }
         default:
             break;
         }
     }
-    mipsFile << "li $v0, 10" << endl;
-    mipsFile << "syscall" << endl;
 }
 
-void addTempVar(set<VarBase*>& tempVars, VarBase* pVar)
+void addTempVar(set<VarBase*>& vars, VarBase* pVar)
 {
+    if (pVar && pVar->varType == ARRAY)
+    {
+        auto* arrayVar = (ArrayVar*)pVar;
+    }
     if (pVar && pVar->varType != TEMPVAR)
     {
         return;
     }
-    tempVars.insert(pVar);
+    vars.insert(pVar);
 }
 
 void loadVar(VarBase* var, int reg)
 {
+    regVars[reg] = var;
     switch (var->varType)
     {
     case TEMPVAR:
@@ -258,10 +458,53 @@ void loadVar(VarBase* var, int reg)
         break;
     }
 #ifdef ARRAYSUPPORT
-        case ARRAY:
+    case ARRAY:
+    {
+        auto arrayVar = (ArrayVar*)var;
+        int offset = -1;
+        if (arrayVar->index->varType == CONVAR)
         {
-            // TODO
+            auto constVar = (ConstVar*)(arrayVar->index);
+            offset = constVar->value * 4;
         }
+        else if (arrayVar->index->varType == TEMPVAR)
+        {
+            loadVar(arrayVar->index, $t4);
+            mipsFile << "sll $" << $t4 << ", $" << $t4 << ", 2" << std::endl;
+        }
+        if (arrayVar->symTabEntry->isGlobal())
+        {
+            if (offset > 0)
+            {
+                mipsFile << "lw $" << reg << ", " << arrayVar->symTabEntry->getName() << "+" << offset << std::endl;
+            }
+            else
+            {
+                mipsFile << "lw $" << reg << ", " << arrayVar->symTabEntry->getName() << "($" << $t4 << ")"
+                    << std::endl;
+            }
+        }
+        else
+        {
+            unsigned int to_sp = curStackSize - arrayVar->symTabEntry->getAddress();
+            if (offset > 0)
+            {
+                mipsFile << "lw $" << reg << ", " << to_sp + offset << "($sp)" << std::endl;
+            }
+            else
+            {
+                mipsFile << "addu $" << $t4 << ", $sp, $" << $t4 << std::endl;
+                mipsFile << "lw $" << reg << ", " << to_sp << "($" << $t4 << ")"
+                    << std::endl;
+            }
+        }
+    }
+#endif
+#ifdef FUNCTIONSUPPORT
+    case RETVAR:
+    {
+        mipsFile << "move $" << reg << ", $v0" << endl;
+    }
 #endif
     default:
     {
@@ -306,14 +549,124 @@ void storeVar(int reg, VarBase* var)
         break;
     }
 #ifdef ARRAYSUPPORT
-        case ARRAY:
+    case ARRAY:
+    {
+        auto arrayVar = (ArrayVar*)var;
+        int offset = -1;
+        if (arrayVar->index->varType == CONVAR)
         {
-            // TODO
+            auto constVar = (ConstVar*)(arrayVar->index);
+            offset = constVar->value * 4;
         }
+        else if (arrayVar->index->varType == TEMPVAR)
+        {
+            loadVar(arrayVar->index, $t4);
+            mipsFile << "sll $" << $t4 << ", $" << $t4 << ", 2" << std::endl;
+        }
+        if (arrayVar->symTabEntry->isGlobal())
+        {
+            if (offset > 0)
+            {
+                mipsFile << "sw $" << reg << ", " << arrayVar->symTabEntry->getName() << "+" << offset << std::endl;
+            }
+            else
+            {
+                mipsFile << "sw $" << reg << ", " << arrayVar->symTabEntry->getName() << "($" << $t4 << ")"
+                    << std::endl;
+            }
+        }
+        else
+        {
+            unsigned int to_sp = curStackSize - arrayVar->symTabEntry->getAddress();
+            if (offset > 0)
+            {
+                mipsFile << "sw $" << reg << ", " << to_sp + offset << "($sp)" << std::endl;
+            }
+            else
+            {
+                mipsFile << "addu $" << $t4 << ", $sp, $" << $t4 << std::endl;
+                mipsFile << "sw $" << reg << ", " << to_sp << "($" << $t4 << ")"
+                    << std::endl;
+            }
+        }
+    }
 #endif
     default:
     {
         break;
     }
+    }
+    regVars[reg] = nullptr;
+}
+
+
+static void loadTempVars()
+{
+    tempVars.resize(midCodes.size());
+    for (int i = 0; i < midCodes.size(); i++)
+    {
+        if (i > 0)
+        {
+            tempVars[i] = tempVars[i - 1];
+        }
+        auto midCode = midCodes[i];
+        switch (midCode->getType())
+        {
+        case ASS_MID:
+        {
+            auto* assignMid = (AssignMid*)midCode;
+            addTempVar(tempVars[i], assignMid->left);
+            if (assignMid->right != nullptr)
+            {
+                addTempVar(tempVars[i], assignMid->right);
+            }
+            addTempVar(tempVars[i], assignMid->des);
+            break;
+        }
+        case WRITE_MID:
+        {
+            auto* writeMid = (WriteMid*)midCode;
+            addTempVar(tempVars[i], writeMid->var);
+            break;
+        }
+        case READ_MID:
+        {
+            auto* readMid = (ReadMid*)midCode;
+            //            addTempVar(tempVars[i], readMid->var);
+            break;
+        }
+        case CALL_MID:
+        {
+            auto* callMid = (CallMid*)midCode;
+            for (auto* var : callMid->valTable)
+            {
+                addTempVar(tempVars[i], var);
+            }
+            break;
+        }
+        case RET_MID:
+        {
+            auto* retMid = (ReturnMid*)midCode;
+            if (!retMid->isVoid)
+            {
+                addTempVar(tempVars[i], retMid->ret);
+            }
+            break;
+        }
+        case BRA_MID:
+        {
+            auto* branchMid = (BranchMid*)midCode;
+            addTempVar(tempVars[i], branchMid->left);
+            addTempVar(tempVars[i], branchMid->right);
+            break;
+        }
+        case FUN_MID:
+        {
+            auto* funcMid = (FunctionMid*)midCode;
+            break;
+        }
+        default:
+            break;
+        }
     }
 }

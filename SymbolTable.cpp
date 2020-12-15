@@ -121,6 +121,21 @@ void SymTabEntry::setAddress(unsigned int address)
     _address = address;
 }
 
+int SymTabEntry::getArraySize() const
+{
+    switch (_dimension)
+    {
+    case 0:
+        return 0;
+    case 1:
+        return _length[0];
+    case 2:
+        return _length[0] * _length[1];
+    default:
+        return -1;
+    }
+}
+
 void initSymTabs()
 {
     SymTabs.push_back(new SymTab(0));
@@ -229,4 +244,16 @@ Param::Param(BaseType type, const string& name) : type(type), name(name)
 BaseType Param::getType() const
 {
     return type;
+}
+
+
+ostream& operator<<(ostream& out, Param& A)
+{
+    out << baseTypeOut[A.type] << " " << A.name;
+    return out;
+}
+
+const string& Param::GetName() const
+{
+    return name;
 }

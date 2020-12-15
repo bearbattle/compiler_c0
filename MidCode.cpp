@@ -22,7 +22,7 @@ int TempVar::count = 0;
 TempVar::TempVar() : VarBase(TEMPVAR)
 {
     id = ++count;
-    offset = count * 4;
+    offset = 0;
 }
 
 void TempVar::out(ostream& os) const
@@ -50,60 +50,66 @@ void Var::out(ostream& os) const
 
 
 ArrayVar::ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript, VarBase* subscript1) : VarBase(ARRAY),
-                                                                                        symTabEntry(
-                                                                                                symTabEntry),
-                                                                                        subscript(subscript),
-                                                                                        subscript1(subscript1)
+                                                                                        symTabEntry(symTabEntry)
 {
+    if (subscript1 == nullptr)// One Dimension Array
+    {
+        if (subscript->varType == CONVAR)
+        {
+            index = subscript;
+        }
+        else
+        {
+            auto* t1 = new TempVar();
+            midCodes.push_back(new AssignMid(ADD_OP, subscript, t1));
+            index = t1;
+        }
+    }
+    else if (subscript1->varType == CONVAR && subscript->varType == CONVAR)
+    {
+        auto* sub = (ConstVar*)subscript;
+        auto* sub1 = (ConstVar*)subscript1;
+        index = new ConstVar(sub->value * symTabEntry->getLength(1) + sub1->value);
+    }
+    else
+    {
+        auto* t1 = new TempVar();
+        midCodes.push_back(new AssignMid(MUL_OP, subscript,
+                new ConstVar(symTabEntry->getLength(1)),
+                t1));
+        auto* t2 = new TempVar();
+        midCodes.push_back(new AssignMid(ADD_OP, t1,
+                subscript1,
+                t2));
+        index = t2;
+    }
 }
 
 void ArrayVar::out(ostream& os) const
 {
     os << symTabEntry->getName() << "[";
-    subscript->out(os);
+    index->out(os);
     os << "]";
-    if (subscript1 != nullptr)
-    {
-        os << "[";
-        subscript1->out(os);
-        os << "]";
-    }
 }
 
 int BaseLabel::count = 0;
 
-BaseLabel::BaseLabel() : id(++count)
+BaseLabel::BaseLabel(bool inc)
 {
+    if (inc)
+    {
+        id = count++;
+    }
+    else
+    {
+        id = count;
+    }
 }
 
 string BaseLabel::label() const
 {
-    return string("label_") + to_string(id);
+    return string("$label_") + to_string(id);
 }
-
-//LoopLabel::LoopLabel() : id(++count)
-//{
-//}
-//
-//string LoopLabel::headLabel() const
-//{
-//    return string("loop_head_") + to_string(id);
-//}
-//
-//string LoopLabel::testLabel() const
-//{
-//    return string("loop_test_") + to_string(id);
-//}
-//
-//string LoopLabel::bodyLabel() const
-//{
-//    return string("loop_body_") + to_string(id);
-//}
-//
-//string LoopLabel::endLabel() const
-//{
-//    return string("loop_end_") + to_string(id);
-//}
 
 MidCode::MidCode(MidType type) : type(type)
 {
@@ -193,14 +199,33 @@ void ReturnMid::out(ostream& os) const
     }
 }
 
-BranchMid::BranchMid(MidOp op, VarBase* left, VarBase* right, BaseLabel* label) : MidCode(BRA_MID), op(op),
-                                                                                  left(left),
-                                                                                  right(right),
-                                                                                  label(label)
+
+static map<MidOp, MidOp> reverseOp = { // NOLINT
+        { LSS_OP, GRE_OP },
+        { LEQ_OP, GRE_OP },
+        { GRE_OP, LEQ_OP },
+        { GEQ_OP, LSS_OP },
+        { EQL_OP, NEQ_OP },
+        { NEQ_OP, EQL_OP },
+};
+
+BranchMid::BranchMid(MidOp op, VarBase* left, VarBase* right, BaseLabel* label,
+        bool reverse) : MidCode(BRA_MID),
+                        left(left),
+                        right(right),
+                        label(label)
 {
+    if (reverse)
+    {
+        this->op = reverseOp[op];
+    }
+    else
+    {
+        this->op = op;
+    }
 }
 
-static map<MidOp, string> op2Branch = { // NOLINT
+map<MidOp, string> op2Branch = { // NOLINT
         { LSS_OP, "blt " },
         { LEQ_OP, "ble " },
         { GRE_OP, "bgt " },
@@ -225,7 +250,7 @@ JumpMid::JumpMid(BaseLabel* label) : MidCode(JMP_MID), label(label)
 
 void JumpMid::out(ostream& os) const
 {
-    os << label->label() << ":";
+    os << "j " << label->label() << ":";
 }
 
 FunctionMid::FunctionMid(SymTabEntry* symTabEntry) : MidCode(FUN_MID), symTabEntry(symTabEntry)
@@ -234,7 +259,37 @@ FunctionMid::FunctionMid(SymTabEntry* symTabEntry) : MidCode(FUN_MID), symTabEnt
 
 void FunctionMid::out(ostream& os) const
 {
-    // TODO
+    bool first = true;
+    os << symTabEntry->getName() << "(";
+    for (auto item : symTabEntry->getParamTab()->params)
+    {
+        if (first)
+        {
+            first = false;
+        }
+        else
+        {
+            os << ", ";
+        }
+        os << item;
+    }
+    os << ")" << endl;
+    for (const auto& item : symTabEntry->getSymTab()->getSymTab())
+    {
+        if (item.second->isConst())
+        {
+            os << "local var const " << item.first << " = " << item.second->getInitVal() << std::endl;
+        }
+        else if (item.second->getDimension() > 0) // array
+        {
+            os << "local var array " << item.first << "[" << item.second->getArraySize() << "]" << std::endl;
+        }
+        else
+        {
+            os << "local var " << item.first << " = " << item.second->getInitVal() << std::endl;
+        }
+    }
+    os << "{";
 }
 
 ReadMid::ReadMid(Var* var) : MidCode(READ_MID), var(var)
@@ -282,7 +337,7 @@ FunctionEndMid::FunctionEndMid() : MidCode(FUN_END_MID)
 
 void FunctionEndMid::out(ostream& os) const
 {
-    // TODO
+    os << "}";
 }
 
 vector<MidCode*> midCodes;
@@ -336,4 +391,88 @@ const string& StringVar::getStr() const
 const string& StringVar::getLabel() const
 {
     return label;
+}
+
+IfLabel::IfLabel() : BaseLabel(), elseLabel(new ElseLabel), endLabel(new EndLabel)
+{
+
+}
+
+LoopLabel::LoopLabel() : BaseLabel(), beginLabel(new BeginLabel), endLabel(new EndLabel)
+{
+}
+
+ElseLabel::ElseLabel() : BaseLabel(false)
+{
+}
+
+string ElseLabel::label() const
+{
+    return string("$else_" + to_string(id));
+}
+
+string IfLabel::label() const
+{
+    return string("$if_" + to_string(id));
+}
+
+EndLabel::EndLabel() : BaseLabel(false)
+{
+
+}
+
+string EndLabel::label() const
+{
+    return string("$end_" + to_string(id));
+}
+
+LabelMid::LabelMid(BaseLabel* label) : MidCode(LAB_MID), label(label)
+{
+}
+
+void LabelMid::out(ostream& os) const
+{
+    os << label->label() << ":";
+}
+
+BeginLabel::BeginLabel() : BaseLabel(false)
+{
+
+}
+
+string BeginLabel::label() const
+{
+    return string("$loop_begin_" + to_string(id));
+}
+
+CaseLabel::CaseLabel(SwitchLabel* switchLabel, long id) : BaseLabel(false),
+                                                          switchLabel(switchLabel),
+                                                          id(id)
+{
+}
+
+string CaseLabel::label() const
+{
+    return string(switchLabel->label() + "_case_" + to_string(id));
+}
+
+SwitchLabel::SwitchLabel(VarBase* caseVar) : BaseLabel(), caseVar(caseVar)
+{
+    caseLabels.push(new CaseLabel(this, caseLabels.size()));
+}
+
+CaseLabel* SwitchLabel::curCaseLabel()
+{
+    return caseLabels.top();
+}
+
+CaseLabel* SwitchLabel::nextCaseLabel()
+{
+    caseLabels.push(new CaseLabel(this, caseLabels.size()));
+    return caseLabels.top();
+}
+
+string SwitchLabel::label() const
+{
+    return string("$switch_" + to_string(id));
 }

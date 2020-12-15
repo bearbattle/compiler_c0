@@ -7,7 +7,7 @@
 #define $zero 0
 #define $at 1
 #define $v0 2
-#define $v1 3
+#define $v1 3 // SET INIT VAL OF LOCAL VAR
 #define $a0 4
 #define $a1 5
 #define $a2 6
@@ -15,9 +15,9 @@
 #define $t0 8
 #define $t1 9
 #define $t2 10
-#define $t3 11
-#define $t4 12
-#define $t5 13
+#define $t3 11 // READ
+#define $t4 12 // ARRAY SUB
+#define $t5 13 // RETURN
 #define $t6 14
 #define $t7 15
 #define $s0 16
