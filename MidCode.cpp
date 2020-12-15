@@ -50,7 +50,7 @@ void Var::out(ostream& os) const
 
 
 ArrayVar::ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript, VarBase* subscript1) : VarBase(ARRAY),
-                                                                                        symTabEntry(symTabEntry)
+symTabEntry(symTabEntry)
 {
     if (subscript1 == nullptr)// One Dimension Array
     {
@@ -75,12 +75,12 @@ ArrayVar::ArrayVar(SymTabEntry* symTabEntry, VarBase* subscript, VarBase* subscr
     {
         auto* t1 = new TempVar();
         midCodes.push_back(new AssignMid(MUL_OP, subscript,
-                new ConstVar(symTabEntry->getLength(1)),
-                t1));
+            new ConstVar(symTabEntry->getLength(1)),
+            t1));
         auto* t2 = new TempVar();
         midCodes.push_back(new AssignMid(ADD_OP, t1,
-                subscript1,
-                t2));
+            subscript1,
+            t2));
         index = t2;
     }
 }
@@ -156,13 +156,13 @@ void AssignMid::out(ostream& os) const
 }
 
 AssignMid::AssignMid(MidOp op, VarBase* left, VarBase* des) : MidCode(ASS_MID), op(op), left(left), right(nullptr),
-                                                              des(des)
+des(des)
 {
 }
 
 AssignMid::AssignMid(MidOp op, VarBase* left, VarBase* right, VarBase* des) : MidCode(ASS_MID), op(op),
-                                                                              left(left), right(right),
-                                                                              des(des)
+left(left), right(right),
+des(des)
 {
 }
 
@@ -201,7 +201,7 @@ void ReturnMid::out(ostream& os) const
 
 
 static map<MidOp, MidOp> reverseOp = { // NOLINT
-        { LSS_OP, GRE_OP },
+        { LSS_OP, GEQ_OP },
         { LEQ_OP, GRE_OP },
         { GRE_OP, LEQ_OP },
         { GEQ_OP, LSS_OP },
@@ -210,10 +210,10 @@ static map<MidOp, MidOp> reverseOp = { // NOLINT
 };
 
 BranchMid::BranchMid(MidOp op, VarBase* left, VarBase* right, BaseLabel* label,
-        bool reverse) : MidCode(BRA_MID),
-                        left(left),
-                        right(right),
-                        label(label)
+    bool reverse) : MidCode(BRA_MID),
+    left(left),
+    right(right),
+    label(label)
 {
     if (reverse)
     {
@@ -278,18 +278,18 @@ void FunctionMid::out(ostream& os) const
     {
         if (item.second->isConst())
         {
-            os << "local var const " << item.first << " = " << item.second->getInitVal() << std::endl;
+            os << "# local var const " << item.first << " = " << item.second->getInitVal() << std::endl;
         }
         else if (item.second->getDimension() > 0) // array
         {
-            os << "local var array " << item.first << "[" << item.second->getArraySize() << "]" << std::endl;
+            os << "# local var array " << item.first << "[" << item.second->getArraySize() << "]" << std::endl;
         }
         else
         {
-            os << "local var " << item.first << " = " << item.second->getInitVal() << std::endl;
+            os << "# local var " << item.first << " = " << item.second->getInitVal() << std::endl;
         }
     }
-    os << "{";
+    os << "# {";
 }
 
 ReadMid::ReadMid(Var* var) : MidCode(READ_MID), var(var)
@@ -446,8 +446,8 @@ string BeginLabel::label() const
 }
 
 CaseLabel::CaseLabel(SwitchLabel* switchLabel, long id) : BaseLabel(false),
-                                                          switchLabel(switchLabel),
-                                                          id(id)
+switchLabel(switchLabel),
+id(id)
 {
 }
 
@@ -456,7 +456,7 @@ string CaseLabel::label() const
     return string(switchLabel->label() + "_case_" + to_string(id));
 }
 
-SwitchLabel::SwitchLabel(VarBase* caseVar) : BaseLabel(), caseVar(caseVar)
+SwitchLabel::SwitchLabel(VarBase* caseVar) : BaseLabel(), caseVar(caseVar), endLabel(new EndLabel)
 {
     caseLabels.push(new CaseLabel(this, caseLabels.size()));
 }

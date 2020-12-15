@@ -68,9 +68,9 @@ static int step(); // Native: unsignedInteger()
 static void valueTable(ParamTab* ptr_paramTab, CallMid* callMid); // Native: expr()
 
 // caseStat: expr()
-static void caseTable(BaseType caseType, SwitchLabel switchLabel); // Native: caseSubStat()
-static void caseSubStat(BaseType caseType, SwitchLabel switchLabel); // Native: constExpr(), stat()
-static void defaultStat(SwitchLabel switchLabel); // Native: stat()
+static void caseTable(BaseType caseType, SwitchLabel* switchLabel); // Native: caseSubStat()
+static void caseSubStat(BaseType caseType, SwitchLabel* switchLabel); // Native: constExpr(), stat()
+static void defaultStat(SwitchLabel* switchLabel); // Native: stat()
 
 // Common Usage
 static int integer();// Native: +|- unsignedInteger()
@@ -1093,13 +1093,12 @@ static void stat()
 
 static void loopStat()
 {
-    LoopLabel loopLabel;
+    auto* loopLabel = new LoopLabel();
     if (lexer::getTokenType() == WHILETK)
     {
-        midCodes.push_back(new LabelMid(loopLabel.beginLabel));
+        midCodes.push_back(new LabelMid(loopLabel->beginLabel));
         lexer::getToken();
         ACCEPT(LPARENT);
-        lexer::getToken();
         VarBase* leftVar, * rightVar;
         MidOp op;
         condition(leftVar, op, rightVar);
@@ -1110,10 +1109,10 @@ static void loopStat()
         }
         lexer::getToken();
     Rparent1:
-        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel.endLabel));
+        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel->endLabel));
         stat();
-        midCodes.push_back(new JumpMid(loopLabel.beginLabel));
-        midCodes.push_back(new LabelMid(loopLabel.endLabel));
+        midCodes.push_back(new JumpMid(loopLabel->beginLabel));
+        midCodes.push_back(new LabelMid(loopLabel->endLabel));
         outputFile << "<循环语句>" << endl;
         return;
 
@@ -1154,8 +1153,8 @@ static void loopStat()
         }
         lexer::getToken();
     semicn2:
-        midCodes.push_back(new LabelMid(loopLabel.beginLabel));
-        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel.endLabel));
+        midCodes.push_back(new LabelMid(loopLabel->beginLabel));
+        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel->endLabel));
         if (lexer::getTokenType() != IDENFR)
         {
             parseError();
@@ -1190,20 +1189,19 @@ static void loopStat()
             midCodes.push_back(new AssignMid(updateOp,
                 new Var(updateEntryRight), new ConstVar(num),
                 new Var(updateEntryLeft)));
-            midCodes.push_back(new JumpMid(loopLabel.beginLabel));
-            midCodes.push_back(new LabelMid(loopLabel.endLabel));
+            midCodes.push_back(new JumpMid(loopLabel->beginLabel));
+            midCodes.push_back(new LabelMid(loopLabel->endLabel));
             outputFile << "<循环语句>" << endl;
             return;
         }
     }
     else if (lexer::getTokenType() == DOTK)
     {
-        midCodes.push_back(new LabelMid(loopLabel.beginLabel));
+        midCodes.push_back(new LabelMid(loopLabel->beginLabel));
         lexer::getToken();
         stat();
         ACCEPT(WHILETK);
         ACCEPT(LPARENT);
-        lexer::getToken();
         VarBase* leftVar, * rightVar;
         MidOp op;
         condition(leftVar, op, rightVar);
@@ -1214,8 +1212,8 @@ static void loopStat()
         }
         lexer::getToken();
     Rparent3:
-        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel.beginLabel, true));
-        midCodes.push_back(new LabelMid(loopLabel.endLabel));
+        midCodes.push_back(new BranchMid(op, leftVar, rightVar, loopLabel->beginLabel, true));
+        midCodes.push_back(new LabelMid(loopLabel->endLabel));
         outputFile << "<循环语句>" << endl;
         return;
     }
@@ -1226,11 +1224,11 @@ static void ifStat()
 {
     ACCEPT(IFTK);
     ACCEPT(LPARENT);
-    IfLabel ifLabel;
+    auto* ifLabel = new IfLabel();
     VarBase* leftVar, * rightVar;
     MidOp op;
     condition(leftVar, op, rightVar);
-    midCodes.push_back(new BranchMid(op, leftVar, rightVar, ifLabel.elseLabel));
+    midCodes.push_back(new BranchMid(op, leftVar, rightVar, ifLabel->elseLabel));
     if (lexer::getTokenType() != RPARENT)
     {
         RparentExpected;
@@ -1239,14 +1237,14 @@ static void ifStat()
     lexer::getToken();
 RParent:
     stat();
-    midCodes.push_back(new JumpMid(ifLabel.endLabel));
-    midCodes.push_back(new LabelMid(ifLabel.elseLabel));
+    midCodes.push_back(new JumpMid(ifLabel->endLabel));
+    midCodes.push_back(new LabelMid(ifLabel->elseLabel));
     if (lexer::getTokenType() == ELSETK)
     {
         lexer::getToken();
         stat();
     }
-    midCodes.push_back(new LabelMid(ifLabel.endLabel));
+    midCodes.push_back(new LabelMid(ifLabel->endLabel));
     outputFile << "<条件语句>" << endl;
     return;
     parseError();
@@ -1495,7 +1493,7 @@ static void caseStat()
     }
     lexer::getToken();
 Rparent:
-    SwitchLabel switchLabel(caseVar);
+    auto* switchLabel = new SwitchLabel(caseVar);
     ACCEPT(LBRACE);
     caseTable(caseType, switchLabel);
     if (lexer::getTokenType() == DEFAULTTK)
@@ -1506,6 +1504,7 @@ Rparent:
     {
         errList.emplace_back(p, lexer::curToken);
     }
+    midCodes.push_back(new LabelMid(switchLabel->endLabel));
     ACCEPT(RBRACE);
     outputFile << "<情况语句>" << endl;
     return;
@@ -1611,7 +1610,7 @@ static void valueTable(ParamTab* paramTab, CallMid* callMid)
     paramTab->checkParams(valueTable, lexer::curToken->getLine());
 }
 
-static void caseTable(BaseType caseType, SwitchLabel switchLabel)
+static void caseTable(BaseType caseType, SwitchLabel* switchLabel)
 {
     do
     {
@@ -1625,9 +1624,9 @@ static bool isCaseSubStat()
     return lexer::getTokenType() == CASETK;
 }
 
-static void caseSubStat(BaseType caseType, SwitchLabel switchLabel)
+static void caseSubStat(BaseType caseType, SwitchLabel* switchLabel)
 {
-    midCodes.push_back(new LabelMid(switchLabel.curCaseLabel()));
+    midCodes.push_back(new LabelMid(switchLabel->curCaseLabel()));
     BaseType constType;
     ACCEPT(CASETK);
     VarBase* caseSubVar;
@@ -1635,15 +1634,16 @@ static void caseSubStat(BaseType caseType, SwitchLabel switchLabel)
     CheckCaseType;
     ACCEPT(COLON);
     midCodes.push_back(new BranchMid(NEQ_OP,
-        switchLabel.caseVar, caseSubVar,
-        switchLabel.nextCaseLabel(), false));
+        switchLabel->caseVar, caseSubVar,
+        switchLabel->nextCaseLabel(), false));
     stat();
+    midCodes.push_back(new JumpMid(switchLabel->endLabel));
     outputFile << "<情况子语句>" << endl;
 }
 
-static void defaultStat(SwitchLabel switchLabel)
+static void defaultStat(SwitchLabel* switchLabel)
 {
-    midCodes.push_back(new LabelMid(switchLabel.curCaseLabel()));
+    midCodes.push_back(new LabelMid(switchLabel->curCaseLabel()));
     ACCEPT(DEFAULTTK);
     ACCEPT(COLON);
     stat();

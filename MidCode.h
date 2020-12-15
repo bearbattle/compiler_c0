@@ -201,6 +201,8 @@ public:
 
     CaseLabel* nextCaseLabel();
 
+    EndLabel* endLabel;
+
     string label() const override;
 };
 

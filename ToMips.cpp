@@ -1,6 +1,8 @@
 #include "ToMips.h"
 #include <set>
 
+#define DEBUG_OUTPUT
+
 static void loadVar(VarBase* var, int reg);
 
 static void storeVar(int reg, VarBase* var);
@@ -23,6 +25,11 @@ void globalInitialize(vector<MidCode*>::iterator iterator)
     while (iterator != midCodes.end() && (*iterator)->getType() == ASS_MID)
     {
         auto* assignMid = (AssignMid*)(*iterator);
+#ifdef DEBUG_OUTPUT
+        mipsFile << "# ";
+        assignMid->out(mipsFile);
+        mipsFile << endl;
+#endif
         if (assignMid->right == nullptr)
         {
             loadVar(assignMid->left, $t0);
@@ -135,6 +142,11 @@ void toMips()
     {
         curMiCodeLine = it - midCodes.begin();
         auto midCode = *it;
+#ifdef DEBUG_OUTPUT
+        mipsFile << "# ";
+        midCode->out(mipsFile);
+        mipsFile << endl;
+#endif
         switch (midCode->getType())
         {
         case ASS_MID:
@@ -498,6 +510,7 @@ void loadVar(VarBase* var, int reg)
                     << std::endl;
             }
         }
+        break;
     }
 #endif
 #ifdef FUNCTIONSUPPORT
