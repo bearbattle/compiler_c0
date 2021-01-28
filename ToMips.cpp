@@ -419,14 +419,14 @@ void toMips()
         }
         case FUN_END_MID:
         {
-            // STORE
-            for (int i = 0; i < 32; i++)
-            {
-                if (regVars[i])
-                {
-                    storeVar(i, regVars[i]);
-                }
-            }
+//            // STORE
+//            for (int i = 0; i < 32; i++)
+//            {
+//                if (regVars[i])
+//                {
+//                    storeVar(i, regVars[i]);
+//                }
+//            }
             mipsFile << "addiu $sp, $sp, " << curStackSize << endl;
             mipsFile << "lw $ra, -4($sp)" << std::endl;
             mipsFile << "jr $ra" << std::endl;
